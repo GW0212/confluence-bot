@@ -2,11 +2,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { question, context } = req.body;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았어요.' });
+  if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았어요.' });
 
-  const systemPrompt = `당신은 ArcheAge WAR 게임의 기획서 전문 AI 어시스턴트입니다.
+  const prompt = `당신은 ArcheAge WAR 게임의 기획서 전문 AI 어시스턴트입니다.
 아래는 Confluence에서 불러온 실제 기획서 내용입니다. 이 내용을 철저히 분석하고, 사용자의 질문에 기획서 내용을 바탕으로 상세하고 정확하게 답변하세요.
 
 답변 규칙:
@@ -18,27 +18,35 @@ export default async function handler(req, res) {
 - 답변 마지막에 참고한 페이지명을 간략히 언급해주세요
 
 === 기획서 내용 ===
-${context.substring(0, 90000)}`;
+${context.substring(0, 90000)}
+
+=== 사용자 질문 ===
+${question}`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: question }]
-      })
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2048,
+          }
+        })
+      }
+    );
 
     const data = await response.json();
+
     if (data.error) throw new Error(data.error.message);
-    res.json({ success: true, answer: data.content[0].text });
+
+    const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!answer) throw new Error('응답을 받지 못했어요.');
+
+    res.json({ success: true, answer });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

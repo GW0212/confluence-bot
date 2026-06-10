@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArcheAge WAR · 기획서 AI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #151820;
+    --surface2: #1c2030;
+    --border: #252a3a;
+    --accent: #4f7cff;
+    --accent2: #7b5cff;
+    --gold: #d4a843;
+    --text: #e2e6f0;
+    --text-muted: #7a8299;
+    --text-dim: #4a5068;
+    --success: #3dd68c;
+    --error: #ff5f5f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg); color: var(--text);
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 13px 22px; background: var(--surface);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .logo {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 17px; flex-shrink: 0;
+  }
+  .hd-title { font-size: 15px; font-weight: 700; }
+  .hd-sub   { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .status-pill {
+    margin-left: auto; display: flex; align-items: center; gap: 7px;
+    padding: 5px 12px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 20px;
+    font-size: 12px; color: var(--text-muted);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink:0; }
+  .dot.on   { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .dot.spin { background: var(--gold); animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* Setup */
+  #setup { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 36px; width: 100%; max-width: 540px;
+  }
+  .card h2 {
+    font-size: 20px; font-weight: 700; margin-bottom: 6px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .card > p { font-size: 13px; color: var(--text-muted); margin-bottom: 26px; line-height: 1.7; }
+
+  .field { margin-bottom: 13px; }
+  .field label { display:block; font-size:12px; color:var(--text-muted); margin-bottom:5px; font-weight:500; }
+  .field input {
+    width:100%; background:var(--bg); border:1px solid var(--border);
+    border-radius:8px; padding:10px 13px; font-size:13px; color:var(--text);
+    font-family:'JetBrains Mono',monospace; outline:none; transition:border-color .2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .btn {
+    width:100%; padding:12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border:none; border-radius:8px; color:#fff;
+    font-size:14px; font-weight:600; cursor:pointer; margin-top:8px;
+    transition:opacity .2s, transform .1s;
+  }
+  .btn:hover { opacity:.9; }
+  .btn:active { transform:scale(.98); }
+  .btn:disabled { opacity:.35; cursor:not-allowed; }
+
+  .err { margin-top:12px; padding:10px 14px; background:rgba(255,95,95,.1);
+    border:1px solid rgba(255,95,95,.3); border-radius:8px;
+    font-size:12px; color:var(--error); display:none; }
+
+  /* Main */
+  #main { display:none; flex:1; overflow:hidden; }
+  .layout { display:flex; height:100%; }
+
+  /* Sidebar */
+  .sidebar {
+    width:268px; flex-shrink:0; background:var(--surface);
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .sb-head {
+    padding:13px 15px; border-bottom:1px solid var(--border);
+    font-size:11px; font-weight:600; color:var(--text-muted);
+    letter-spacing:.7px; text-transform:uppercase;
+  }
+  .page-list { flex:1; overflow-y:auto; padding:6px; }
+  .page-list::-webkit-scrollbar { width:3px; }
+  .page-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  .pi {
+    padding:8px 10px; border-radius:7px; cursor:pointer;
+    font-size:12px; color:var(--text-muted);
+    display:flex; align-items:flex-start; gap:6px; line-height:1.4;
+    transition:background .15s, color .15s;
+  }
+  .pi:hover { background:var(--surface2); color:var(--text); }
+  .pi.active { background:rgba(79,124,255,.15); color:var(--accent); }
+  .sb-foot { padding:10px 14px; border-top:1px solid var(--border); font-size:11px; color:var(--text-dim); line-height:1.5; }
+
+  /* Chat */
+  .chat { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .msgs { flex:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:18px; }
+  .msgs::-webkit-scrollbar { width:3px; }
+  .msgs::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  .welcome { text-align:center; padding:44px 20px; color:var(--text-muted); }
+  .welcome h3 { font-size:18px; color:var(--text); margin-bottom:8px; }
+  .welcome p { font-size:13px; line-height:1.7; margin-bottom:22px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .chip {
+    padding:7px 14px; background:var(--surface2); border:1px solid var(--border);
+    border-radius:20px; font-size:12px; color:var(--text-muted); cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .chip:hover { background:rgba(79,124,255,.15); border-color:var(--accent); color:var(--accent); }
+
+  .msg { display:flex; gap:10px; align-items:flex-start; }
+  .msg.user { flex-direction:row-reverse; }
+  .avatar {
+    width:30px; height:30px; border-radius:8px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:14px;
+  }
+  .msg.ai   .avatar { background:linear-gradient(135deg,var(--accent),var(--accent2)); }
+  .msg.user .avatar { background:var(--surface2); border:1px solid var(--border); }
+
+  .bubble {
+    max-width:76%; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:12px 15px; font-size:14px; line-height:1.75;
+  }
+  .msg.user .bubble { background:rgba(79,124,255,.13); border-color:rgba(79,124,255,.28); }
+  .bubble p { margin-bottom:8px; }
+  .bubble p:last-child { margin-bottom:0; }
+  .bubble ul, .bubble ol { padding-left:18px; margin-bottom:8px; }
+  .bubble li { margin-bottom:3px; }
+  .bubble strong { color:var(--accent); font-weight:600; }
+  .bubble code { font-family:'JetBrains Mono',monospace; background:var(--bg); padding:1px 6px; border-radius:4px; font-size:12px; color:var(--gold); }
+  .bubble h3, .bubble h4 { margin:12px 0 6px; font-weight:600; }
+  .bubble h3:first-child, .bubble h4:first-child { margin-top:0; }
+  .src-tag {
+    display:inline-flex; align-items:center; gap:4px; margin-top:10px;
+    padding:3px 9px; background:rgba(79,124,255,.1);
+    border:1px solid rgba(79,124,255,.2); border-radius:10px;
+    font-size:11px; color:var(--accent);
+  }
+  .typing { display:flex; gap:4px; align-items:center; padding:3px 0; }
+  .typing span { width:6px; height:6px; border-radius:50%; background:var(--text-muted); animation:bob 1.2s infinite; }
+  .typing span:nth-child(2){animation-delay:.2s}
+  .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes bob { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+
+  /* Input */
+  .input-wrap { padding:14px 22px; border-top:1px solid var(--border); background:var(--surface); }
+  .input-row { display:flex; gap:9px; align-items:flex-end; }
+  textarea {
+    flex:1; background:var(--bg); border:1px solid var(--border); border-radius:10px;
+    padding:11px 13px; font-size:14px; color:var(--text);
+    font-family:'Noto Sans KR',sans-serif; resize:none; outline:none;
+    min-height:44px; max-height:120px; line-height:1.5; transition:border-color .2s;
+  }
+  textarea:focus { border-color:var(--accent); }
+  textarea::placeholder { color:var(--text-dim); }
+  .send-btn {
+    width:44px; height:44px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border:none; border-radius:10px; color:#fff; font-size:18px;
+    cursor:pointer; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    transition:opacity .2s, transform .1s;
+  }
+  .send-btn:hover { opacity:.9; }
+  .send-btn:active { transform:scale(.95); }
+  .send-btn:disabled { opacity:.3; cursor:not-allowed; }
+  .hint { font-size:11px; color:var(--text-dim); margin-top:7px; }
+
+  /* Overlay */
+  #overlay {
+    position:fixed; inset:0; background:rgba(13,15,20,.96);
+    display:none; flex-direction:column; align-items:center;
+    justify-content:center; gap:14px; z-index:50;
+  }
+  .spinner {
+    width:46px; height:46px; border:3px solid var(--border);
+    border-top-color:var(--accent); border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .ov-text { font-size:14px; color:var(--text-muted); }
+  .ov-sub  { font-size:12px; color:var(--text-dim); margin-top:-6px; max-width:300px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .prog-wrap { width:240px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .prog { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .35s ease; }
+</style>
+</head>
+<body>
+
+<!-- Overlay -->
+<div id="overlay">
+  <div class="spinner"></div>
+  <div class="ov-text" id="ov-text">Confluence 연결 중...</div>
+  <div class="prog-wrap"><div class="prog" id="prog" style="width:0%"></div></div>
+  <div class="ov-sub" id="ov-sub"></div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">⚔</div>
+  <div>
+    <div class="hd-title">ArcheAge WAR · 기획서 AI</div>
+    <div class="hd-sub">Confluence 기반 질의응답 시스템</div>
+  </div>
+  <div class="status-pill">
+    <div class="dot" id="dot"></div>
+    <span id="st-text">대기중</span>
+  </div>
+</header>
+
+<!-- Setup -->
+<div id="setup">
+  <div class="card">
+    <h2>기획서 AI 어시스턴트</h2>
+    <p>Atlassian 계정 정보를 입력하면 Confluence 기획서를 자동으로 불러와<br>AI가 질문에 상세하게 답해드려요.</p>
+
+    <div class="row2">
+      <div class="field">
+        <label>Atlassian 이메일</label>
+        <input id="f-email" type="email" placeholder="example@company.com">
+      </div>
+      <div class="field">
+        <label>Space Key</label>
+        <input id="f-space" type="text" value="ArcheageM">
+      </div>
+    </div>
+    <div class="field">
+      <label>API 토큰</label>
+      <input id="f-token" type="password" placeholder="ATATT3x...">
+    </div>
+    <div class="field">
+      <label>Confluence Base URL</label>
+      <input id="f-base" type="text" value="https://xlgames-jira.atlassian.net">
+    </div>
+
+    <button class="btn" id="conn-btn" onclick="connect()">🚀 기획서 불러오기</button>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sb-head">📄 로드된 페이지</div>
+      <div class="page-list" id="page-list"></div>
+      <div class="sb-foot" id="sb-foot"></div>
+    </div>
+    <div class="chat">
+      <div class="msgs" id="msgs">
+        <div class="welcome" id="welcome">
+          <h3>⚔ ArcheAge WAR 기획서 AI</h3>
+          <p>기획서 내용을 전부 학습했어요.<br>게임 시스템, 콘텐츠, 수치 데이터 등 무엇이든 질문해보세요!</p>
+          <div class="chips" id="chips"></div>
+        </div>
+      </div>
+      <div class="input-wrap">
+        <div class="input-row">
+          <textarea id="q-input" placeholder="기획서에 대해 질문해보세요... (Enter: 전송 / Shift+Enter: 줄바꿈)" rows="1"></textarea>
+          <button class="send-btn" id="send-btn" onclick="send()">↑</button>
+        </div>
+        <div class="hint">로드된 Confluence 기획서 전체 내용을 바탕으로 답변합니다</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// API 기본 경로 (Vercel이면 /api, 로컬이면 그대로)
+const API = '';
+
+let ctx = '';
+let busy = false;
+
+function showOv(t, p, s='') {
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('ov-text').textContent = t;
+  document.getElementById('prog').style.width = p + '%';
+  document.getElementById('ov-sub').textContent = s;
+}
+function hideOv() { document.getElementById('overlay').style.display = 'none'; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function connect() {
+  const email = document.getElementById('f-email').value.trim();
+  const token = document.getElementById('f-token').value.trim();
+  const space = document.getElementById('f-space').value.trim();
+  const base  = document.getElementById('f-base').value.trim().replace(/\/$/, '');
+
+  if (!email || !token) return showErr('이메일과 API 토큰을 입력해주세요.');
+
+  const btn = document.getElementById('conn-btn');
+  btn.disabled = true; btn.textContent = '연결 중...';
+  document.getElementById('err').style.display = 'none';
+  showOv('서버에 연결 중...', 5);
+
+  try {
+    // 1. 페이지 목록
+    showOv('페이지 목록 불러오는 중...', 15, `Space: ${space}`);
+    const pRes = await fetch(`${API}/api/pages`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token, baseUrl: base, spaceKey: space })
+    });
+    const pData = await pRes.json();
+    if (!pRes.ok) throw new Error(pData.error || '페이지 목록 조회 실패');
+
+    const pages = pData.pages;
+    if (!pages.length) throw new Error('페이지를 찾지 못했어요. Space Key를 확인해주세요.');
+
+    // 2. 각 페이지 내용 (최대 80개)
+    const limit = Math.min(pages.length, 80);
+    let loaded = [];
+
+    for (let i = 0; i < limit; i++) {
+      const pg = pages[i];
+      const pct = 20 + Math.round((i / limit) * 70);
+      showOv(`페이지 읽는 중 (${i+1}/${limit})`, pct, pg.title);
+
+      try {
+        const cRes = await fetch(`${API}/api/page-content`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, token, baseUrl: base, pageId: pg.id })
+        });
+        const cData = await cRes.json();
+        if (cData.success && cData.content?.trim()) {
+          loaded.push({ title: pg.title, id: pg.id, content: cData.content });
+        }
+      } catch(e) { /* 개별 페이지 실패 무시 */ }
+    }
+
+    showOv('AI 컨텍스트 구성 중...', 95, '거의 다 됐어요!');
+    ctx = loaded.map(p => `=== [${p.title}] ===\n${p.content.substring(0, 4000)}`).join('\n\n');
+
+    showOv('완료!', 100, '');
+    await sleep(500);
+    hideOv();
+    showMain(loaded);
+
+  } catch(e) {
+    hideOv();
+    btn.disabled = false; btn.textContent = '🚀 기획서 불러오기';
+    showErr(`오류: ${e.message}`);
+  }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('err');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function showMain(pages) {
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+
+  document.getElementById('dot').className = 'dot on';
+  document.getElementById('st-text').textContent = `${pages.length}개 페이지 로드됨`;
+
+  const list = document.getElementById('page-list');
+  pages.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'pi';
+    el.innerHTML = `<span>📄</span><span>${p.title}</span>`;
+    el.onclick = () => {
+      document.querySelectorAll('.pi').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('q-input').value = `"${p.title}" 페이지 내용을 자세히 설명해줘`;
+      document.getElementById('q-input').focus();
+    };
+    list.appendChild(el);
+  });
+
+  document.getElementById('sb-foot').textContent =
+    `총 ${pages.length}개 페이지 · ${Math.round(ctx.length/1000)}K chars`;
+
+  const suggestions = [
+    '주요 게임 시스템을 요약해줘',
+    '전투 관련 기획 내용은?',
+    '어떤 페이지들이 있어?',
+    '핵심 수치·밸런스 데이터는?',
+    '콘텐츠 로드맵 알려줘',
+  ];
+  const chips = document.getElementById('chips');
+  suggestions.forEach(s => {
+    const c = document.createElement('div');
+    c.className = 'chip'; c.textContent = s;
+    c.onclick = () => { document.getElementById('q-input').value = s; send(); };
+    chips.appendChild(c);
+  });
+}
+
+async function send() {
+  const input = document.getElementById('q-input');
+  const msg = input.value.trim();
+  if (!msg || busy) return;
+
+  busy = true;
+  input.value = ''; resize(input);
+
+  const welcome = document.getElementById('welcome');
+  if (welcome) welcome.remove();
+
+  addMsg('user', msg);
+  const typEl = addTyping();
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('dot').className = 'dot spin';
+  document.getElementById('st-text').textContent = 'AI 생각 중...';
+
+  try {
+    const res = await fetch(`${API}/api/ask`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: msg, context: ctx })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '서버 오류');
+    typEl.remove();
+    addMsg('ai', data.answer, true);
+  } catch(e) {
+    typEl.remove();
+    addMsg('ai', `❌ 오류: ${e.message}`);
+  }
+
+  busy = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('dot').className = 'dot on';
+  document.getElementById('st-text').textContent = '기획서 로드됨';
+}
+
+function addMsg(role, text, markdown=false) {
+  const msgs = document.getElementById('msgs');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  const av = document.createElement('div');
+  av.className = 'avatar';
+  av.textContent = role === 'ai' ? '⚔' : '👤';
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+
+  if (role==='ai' && markdown) {
+    bub.innerHTML = md(text);
+    const tag = document.createElement('div');
+    tag.className = 'src-tag';
+    tag.innerHTML = '📄 Confluence 기획서 기반 답변';
+    bub.appendChild(tag);
+  } else {
+    bub.textContent = text;
+  }
+
+  div.appendChild(av); div.appendChild(bub);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function addTyping() {
+  const msgs = document.getElementById('msgs');
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+  div.innerHTML = `<div class="avatar">⚔</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function md(t) {
+  return t
+    .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^### (.+)$/gm,  '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,   '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[^<]*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .split(/\n\n+/)
+    .map(b => b.trim().startsWith('<') ? b : `<p>${b.replace(/\n/g,' ')}</p>`)
+    .join('');
+}
+
+const ta = document.getElementById('q-input');
+ta.addEventListener('input', () => resize(ta));
+ta.addEventListener('keydown', e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();} });
+function resize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+</script>
+</body>
+</html>

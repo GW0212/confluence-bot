@@ -27,27 +27,50 @@ ${context.substring(0, 90000)}
 === 사용자 질문 ===
 ${question}`;
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
-        })
+  // 시도할 모델 목록 (순서대로 fallback)
+  const models = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro-latest',
+  ];
+
+  let lastError = '';
+
+  for (const model of models) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.error) {
+        lastError = data.error.message;
+        continue; // 다음 모델 시도
       }
-    );
 
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
+      const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!answer) {
+        lastError = '응답을 받지 못했어요.';
+        continue;
+      }
 
-    const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!answer) throw new Error('응답을 받지 못했어요.');
-
-    res.json({ success: true, answer });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+      return res.json({ success: true, answer, model });
+    } catch (e) {
+      lastError = e.message;
+      continue;
+    }
   }
+
+  res.status(500).json({ error: `모든 모델 시도 실패: ${lastError}` });
 }

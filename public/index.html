@@ -345,7 +345,7 @@ async function connectConfluence() {
     cached.loaded.forEach(function(p) {
       pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
     });
-    ctx = cached.loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 3000); }).join('\n\n');
+    ctx = cached.loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500); }).join('\n\n');
     showOv('완료!', 100, '');
     await sleep(300);
     hideOv();
@@ -392,7 +392,7 @@ async function connectConfluence() {
     }
 
     showOv('저장 중...', 97, '다음 접속부터 즉시 로드됩니다!');
-    ctx = loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 3000); }).join('\n\n');
+    ctx = loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500); }).join('\n\n');
     saveCache(space, base, pages, loaded);
     showOv('완료!', 100, '');
     await sleep(400);
@@ -693,7 +693,7 @@ window.addEventListener('load', function() {
             pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
           });
           ctx = cached.loaded.map(function(p) {
-            return '=== [' + p.title + '] ===\n' + p.content.substring(0, 3000);
+            return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500);
           }).join('\n\n');
           showOv('완료!', 100, '');
           await sleep(300);

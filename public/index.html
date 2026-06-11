@@ -349,11 +349,36 @@ function showErr(msg) {
 
 // ── 캐시 ──
 function saveCache(space, base, pages, loaded, savedCtx) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ space: space, base: base, savedAt: Date.now(), pages: pages, loaded: loaded, ctx: savedCtx })); }
-  catch(e) {
-    // ctx 제외하고 재시도
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ space: space, base: base, savedAt: Date.now(), pages: pages, loaded: loaded })); }
-    catch(e2) { console.warn('캐시 저장 실패:', e2); }
+  // html 제외, content 500자로 축소해서 용량 절약 (5MB 한도 대응)
+  var slim = loaded.map(function(p) {
+    return { id: p.id, title: p.title, depth: p.depth, hasChildren: p.hasChildren,
+             content: (p.content || '').substring(0, 500), pageUrl: p.pageUrl || '' };
+  });
+  var data = { space: space, base: base, savedAt: Date.now(), pages: pages, loaded: slim, ctx: savedCtx };
+  var json = JSON.stringify(data);
+  // 4MB 초과면 ctx 제외
+  if (json.length > 4 * 1024 * 1024) {
+    data.ctx = null;
+    json = JSON.stringify(data);
+  }
+  // 3MB 초과면 content도 100자로 더 줄이기
+  if (json.length > 3 * 1024 * 1024) {
+    data.loaded = loaded.map(function(p) {
+      return { id: p.id, title: p.title, depth: p.depth, hasChildren: p.hasChildren, content: '', pageUrl: p.pageUrl || '' };
+    });
+    json = JSON.stringify(data);
+  }
+  try {
+    localStorage.setItem(CACHE_KEY, json);
+    console.log('캐시 저장 완료:', Math.round(json.length/1024) + 'KB');
+  } catch(e) {
+    console.warn('캐시 저장 실패:', e);
+    // 최소한 페이지 목록만 저장
+    try {
+      var minimal = { space: space, base: base, savedAt: Date.now(), pages: pages,
+        loaded: loaded.map(function(p){ return {id:p.id,title:p.title,depth:p.depth,hasChildren:p.hasChildren,content:'',pageUrl:p.pageUrl||''}; }) };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(minimal));
+    } catch(e2) { console.warn('최소 캐시도 실패:', e2); }
   }
 }
 function getCache(space, base) {
@@ -572,7 +597,7 @@ function showMain(allPages, loaded, savedAt) {
 }
 
 // ── 모달 ──
-function openModal(id) {
+async function openModal(id) {
   var pg = pageStore[id];
   if (!pg) return;
 
@@ -582,12 +607,51 @@ function openModal(id) {
   });
 
   document.getElementById('modal-title').textContent = pg.title;
+  document.getElementById('page-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
   var body = document.getElementById('modal-body');
+  body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">불러오는 중...</div>';
+
+  // html 없으면 실시간 fetch
+  if (!pg.html && creds.email && creds.token) {
+    try {
+      var r = await fetch(API + '/api/page-content', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ email: creds.email, token: creds.token, baseUrl: creds.base, pageId: id })
+      });
+      var d = await r.json();
+      if (d.success) { pg.html = d.html || ''; pg.content = d.content || pg.content; }
+    } catch(e) { console.warn('페이지 내용 fetch 실패:', e); }
+  }
 
   if (pg.html) {
     var html = pg.html.replace(/src="\/wiki\//g, 'src="' + creds.base + '/wiki/');
     body.innerHTML = html;
-    body.querySelectorAll('a').forEach(function(a) { a.target = '_blank'; a.rel = 'noopener'; });
+    body.querySelectorAll('a').forEach(function(a) {
+      var href = a.getAttribute('href') || '';
+      // Confluence 내부 링크 처리
+      if (href.includes('/wiki/spaces/') || href.includes('/pages/') || href.startsWith('/wiki/')) {
+        a.href = '#';
+        a.addEventListener('click', function(e) {
+          e.preventDefault();
+          // URL에서 pageId 추출 시도
+          var pidMatch = href.match(/\/pages\/(\d+)/);
+          if (pidMatch && pageStore[pidMatch[1]]) {
+            openModal(pidMatch[1]);
+          } else {
+            // 링크 텍스트로 페이지 검색
+            var linkText = a.textContent.trim();
+            if (linkText) openModalByTitle(linkText);
+            else window.open(creds.base + href, '_blank');
+          }
+        });
+      } else if (href && !href.startsWith('#')) {
+        a.target = '_blank';
+        a.rel = 'noopener';
+        // 상대경로면 절대경로로 변환
+        if (href.startsWith('/')) a.href = creds.base + href;
+      }
+    });
     body.querySelectorAll('.confluence-information-macro,[data-macro-name]').forEach(function(el) {
       if (el.textContent.trim().length < 3) el.style.display = 'none';
     });
@@ -599,9 +663,6 @@ function openModal(id) {
   } else {
     body.innerHTML = '<p style="white-space:pre-wrap;color:var(--text-muted)">' + (pg.content || '내용 없음') + '</p>';
   }
-
-  document.getElementById('page-modal').classList.add('open');
-  document.body.style.overflow = 'hidden';
 
   document.getElementById('modal-ask-btn').onclick = function() {
     closeModal();
@@ -705,6 +766,9 @@ function addTyping() {
 }
 
 function mdToHtml(t) {
+  // 불완전한 [[ 제거 (AI가 중간에 끊겼을 때)
+  t = t.replace(/\[\[(?![^\]]*\]\])[^
+]*/g, '');
   // [[페이지명]] → 클릭 가능한 링크로 변환
   t = t.replace(/\[\[(.+?)\]\]/g, function(_, pageName) {
     var pg = findPageByTitle(pageName.trim());

@@ -7,7 +7,6 @@ export default async function handler(req, res) {
 
   const { question, context } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
-
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았어요.' });
 
   const prompt = `당신은 ArcheAge WAR 게임의 기획서 전문 AI 어시스턴트입니다.
@@ -27,17 +26,15 @@ ${context.substring(0, 90000)}
 === 사용자 질문 ===
 ${question}`;
 
-  // 시도할 모델 목록 (순서대로 fallback)
+  // 2026년 기준 무료 티어 사용 가능한 모델 목록
   const models = [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-2.0-flash-lite',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash-8b',
-    'gemini-1.5-pro-latest',
+    'gemini-2.5-flash-lite',
   ];
 
   let lastError = '';
-
   for (const model of models) {
     try {
       const response = await fetch(
@@ -51,26 +48,14 @@ ${question}`;
           })
         }
       );
-
       const data = await response.json();
-
-      if (data.error) {
-        lastError = data.error.message;
-        continue; // 다음 모델 시도
-      }
-
+      if (data.error) { lastError = data.error.message; continue; }
       const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!answer) {
-        lastError = '응답을 받지 못했어요.';
-        continue;
-      }
-
+      if (!answer) { lastError = '응답을 받지 못했어요.'; continue; }
       return res.json({ success: true, answer, model });
     } catch (e) {
-      lastError = e.message;
-      continue;
+      lastError = e.message; continue;
     }
   }
-
-  res.status(500).json({ error: `모든 모델 시도 실패: ${lastError}` });
+  res.status(500).json({ error: `AI 응답 실패: ${lastError}` });
 }

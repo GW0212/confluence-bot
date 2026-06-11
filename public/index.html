@@ -573,7 +573,7 @@ function addChips() {
   var chips = document.getElementById('chips');
   if (!chips) return;
   chips.innerHTML = '';
-  ['주요 게임 시스템을 요약해줘','전투 관련 기획 내용은?','어떤 페이지들이 있어?','핵심 수치·밸런스 데이터는?','콘텐츠 로드맵 알려줘'].forEach(function(s) {
+  ['주요 게임 시스템을 요약해줘','전투 시스템 기획 내용 알려줘','캐릭터 속도 시스템은?','패치 노트 최신 내용 알려줘','밸런스 수치 데이터 알려줘'].forEach(function(s) {
     var c = document.createElement('div');
     c.className = 'chip'; c.textContent = s;
     c.addEventListener('click', function(){ document.getElementById('q-input').value = s; sendMsg(); });

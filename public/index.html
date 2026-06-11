@@ -5,259 +5,161 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ArcheAge WAR · 기획서 AI</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+:root,[data-theme="light"]{--bg:#f4f6fb;--surface:#fff;--surface2:#f0f2f8;--border:#dde1ee;--accent:#3a6ff7;--accent2:#6b44f8;--gold:#c08a1e;--text:#1a1d2e;--text-muted:#6b7394;--text-dim:#a0a8c0;--success:#1a9e5f;--error:#d93025;--shadow:0 2px 12px rgba(60,80,180,.08);}
+[data-theme="dark"]{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--border:#252a3a;--accent:#4f7cff;--accent2:#7b5cff;--gold:#d4a843;--text:#e2e6f0;--text-muted:#7a8299;--text-dim:#4a5068;--success:#3dd68c;--error:#ff5f5f;--shadow:0 2px 12px rgba(0,0,0,.3);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;transition:background .25s,color .25s;}
 
-  :root,[data-theme="light"]{
-    --bg:#f4f6fb;--surface:#fff;--surface2:#f0f2f8;--border:#dde1ee;
-    --accent:#3a6ff7;--accent2:#6b44f8;--gold:#c08a1e;
-    --text:#1a1d2e;--text-muted:#6b7394;--text-dim:#a0a8c0;
-    --success:#1a9e5f;--error:#d93025;--shadow:0 2px 12px rgba(60,80,180,.08);
-  }
-  [data-theme="dark"]{
-    --bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--border:#252a3a;
-    --accent:#4f7cff;--accent2:#7b5cff;--gold:#d4a843;
-    --text:#e2e6f0;--text-muted:#7a8299;--text-dim:#4a5068;
-    --success:#3dd68c;--error:#ff5f5f;--shadow:0 2px 12px rgba(0,0,0,.3);
-  }
+/* Header */
+header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;box-shadow:var(--shadow);}
+.hd-center{display:flex;align-items:center;justify-content:center;gap:10px;}
+.logo{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.hd-title{font-size:14px;font-weight:700;line-height:1.2;}
+.hd-sub{font-size:11px;color:var(--text-muted);}
+.hd-right{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
+.theme-btn{width:34px;height:34px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.theme-btn:hover{background:var(--border);}
+.status-pill{display:flex;align-items:center;gap:6px;padding:4px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--text-muted);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text-dim);flex-shrink:0;}
+.dot.on{background:var(--success);box-shadow:0 0 6px var(--success);}
+.dot.spin{background:var(--gold);animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);
-    height:100vh;display:flex;flex-direction:column;overflow:hidden;transition:background .25s,color .25s;}
+/* Overlay */
+#overlay{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:999;background:rgba(244,246,251,.95);}
+[data-theme="dark"] #overlay{background:rgba(13,15,20,.96);}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.ov-text{font-size:14px;color:var(--text-muted);}
+.ov-sub{font-size:12px;color:var(--text-dim);margin-top:-6px;max-width:300px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.prog-wrap{width:240px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.prog{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .35s ease;}
 
-  /* ── Header ── */
-  header{
-    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
-    padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);
-    flex-shrink:0;box-shadow:var(--shadow);
-  }
-  .hd-left{display:flex;align-items:center;}
-  .hd-center{display:flex;align-items:center;justify-content:center;gap:10px;}
-  .logo{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-  .hd-texts{display:flex;flex-direction:column;align-items:flex-start;}
-  .hd-title{font-size:14px;font-weight:700;line-height:1.2;}
-  .hd-sub{font-size:11px;color:var(--text-muted);}
-  .hd-right{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
-  .theme-btn{width:34px;height:34px;background:var(--surface2);border:1px solid var(--border);
-    border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;
-    justify-content:center;transition:background .2s;flex-shrink:0;}
-  .theme-btn:hover{background:var(--border);}
-  .status-pill{display:flex;align-items:center;gap:6px;padding:4px 11px;
-    background:var(--surface2);border:1px solid var(--border);border-radius:20px;
-    font-size:11px;color:var(--text-muted);}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--text-dim);flex-shrink:0;}
-  .dot.on{background:var(--success);box-shadow:0 0 6px var(--success);}
-  .dot.spin{background:var(--gold);animation:blink 1s infinite;}
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+/* Setup */
+#setup{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;width:100%;max-width:540px;box-shadow:var(--shadow);}
+.card h2{font-size:20px;font-weight:700;margin-bottom:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.card>p{font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.7;}
+.field{margin-bottom:13px;}
+.field label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:5px;font-weight:500;}
+.field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 13px;font-size:13px;color:var(--text);font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.conn-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:opacity .2s;}
+.conn-btn:hover{opacity:.9;}
+.conn-btn:disabled{opacity:.35;cursor:not-allowed;}
+.err-box{margin-top:12px;padding:10px 14px;background:rgba(217,48,37,.08);border:1px solid rgba(217,48,37,.25);border-radius:8px;font-size:12px;color:var(--error);display:none;}
 
-  /* ── Setup ── */
-  #setup{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;
-    padding:36px;width:100%;max-width:540px;box-shadow:var(--shadow);}
-  .card h2{font-size:20px;font-weight:700;margin-bottom:6px;
-    background:linear-gradient(90deg,var(--accent),var(--accent2));
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-  .card>p{font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.7;}
-  .field{margin-bottom:13px;}
-  .field label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:5px;font-weight:500;}
-  .field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;
-    padding:10px 13px;font-size:13px;color:var(--text);font-family:'JetBrains Mono',monospace;
-    outline:none;transition:border-color .2s,background .25s;}
-  .field input:focus{border-color:var(--accent);}
-  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;
-    transition:opacity .2s,transform .1s;}
-  .btn:hover{opacity:.9;}.btn:active{transform:scale(.98);}.btn:disabled{opacity:.35;cursor:not-allowed;}
-  .err{margin-top:12px;padding:10px 14px;background:rgba(217,48,37,.08);
-    border:1px solid rgba(217,48,37,.25);border-radius:8px;font-size:12px;color:var(--error);display:none;}
+/* Main */
+#main{display:none;flex:1;overflow:hidden;}
+.layout{display:flex;height:100%;}
 
-  /* ── Main ── */
-  #main{display:none;flex:1;overflow:hidden;}
-  .layout{display:flex;height:100%;}
+/* Sidebar */
+.sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sb-head{padding:11px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;}
+.page-list{flex:1;overflow-y:auto;padding:4px;}
+.page-list::-webkit-scrollbar{width:3px;}
+.page-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.pi{display:flex;align-items:center;border-radius:6px;cursor:pointer;transition:background .15s;user-select:none;}
+.pi:hover{background:var(--surface2);}
+.pi.active{background:rgba(58,111,247,.12);}
+.pi-indent{flex-shrink:0;}
+.pi-toggle{width:18px;height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--text-dim);transition:transform .2s;}
+.pi-toggle.open{transform:rotate(90deg);}
+.pi-icon{font-size:12px;flex-shrink:0;margin-right:4px;}
+.pi-label{flex:1;font-size:12px;color:var(--text-muted);padding:5px 4px 5px 0;line-height:1.3;word-break:keep-all;}
+.pi.active .pi-label{color:var(--accent);font-weight:500;}
+.pi:hover .pi-label{color:var(--text);}
+.pi-children{display:none;}
+.pi-children.open{display:block;}
+.sb-foot{padding:9px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);line-height:1.5;}
 
-  /* ── Sidebar ── */
-  .sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
-    display:flex;flex-direction:column;overflow:hidden;}
-  .sb-head{padding:11px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;
-    color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;}
-  .page-list{flex:1;overflow-y:auto;padding:4px;}
-  .page-list::-webkit-scrollbar{width:3px;}
-  .page-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+/* Chat */
+.chat{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.msgs{flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:16px;}
+.msgs::-webkit-scrollbar{width:3px;}
+.msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.welcome{text-align:center;padding:40px 20px;color:var(--text-muted);}
+.welcome h3{font-size:17px;color:var(--text);margin-bottom:8px;}
+.welcome p{font-size:13px;line-height:1.7;margin-bottom:20px;}
+.chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;}
+.chip{padding:6px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--text-muted);cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
+.chip:hover{background:rgba(58,111,247,.1);border-color:var(--accent);color:var(--accent);}
+.msg{display:flex;gap:9px;align-items:flex-start;}
+.msg.user{flex-direction:row-reverse;}
+.avatar{width:29px;height:29px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.msg.ai .avatar{background:linear-gradient(135deg,var(--accent),var(--accent2));}
+.msg.user .avatar{background:var(--surface2);border:1px solid var(--border);}
+.bubble{max-width:76%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 14px;font-size:14px;line-height:1.75;box-shadow:var(--shadow);}
+.msg.user .bubble{background:linear-gradient(135deg,rgba(58,111,247,.1),rgba(107,68,248,.06));border-color:rgba(58,111,247,.22);}
+.bubble p{margin-bottom:7px;}.bubble p:last-child{margin-bottom:0;}
+.bubble ul,.bubble ol{padding-left:18px;margin-bottom:7px;}
+.bubble li{margin-bottom:2px;}
+.bubble strong{color:var(--accent);font-weight:600;}
+.bubble code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:12px;color:var(--gold);}
+.bubble h3,.bubble h4{margin:10px 0 5px;font-weight:600;}
+.bubble h3:first-child,.bubble h4:first-child{margin-top:0;}
+.typing{display:flex;gap:4px;align-items:center;padding:3px 0;}
+.typing span{width:5px;height:5px;border-radius:50%;background:var(--text-muted);animation:bob 1.2s infinite;}
+.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes bob{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 
-  /* 트리 아이템 */
-  .pi{
-    display:flex;align-items:center;gap:0;
-    border-radius:6px;cursor:pointer;
-    transition:background .15s,color .15s;
-    user-select:none;
-  }
-  .pi:hover{background:var(--surface2);}
-  .pi.active{background:rgba(58,111,247,.12);}
-  .pi-toggle{
-    width:20px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-    font-size:9px;color:var(--text-dim);transition:transform .2s;
-  }
-  .pi-toggle.open{transform:rotate(90deg);}
-  .pi-icon{font-size:12px;flex-shrink:0;margin-right:4px;}
-  .pi-label{
-    flex:1;font-size:12px;color:var(--text-muted);padding:6px 6px 6px 0;
-    line-height:1.3;word-break:keep-all;
-  }
-  .pi.active .pi-label{color:var(--accent);font-weight:500;}
-  .pi:hover .pi-label{color:var(--text);}
-  .pi-children{display:none;}
-  .pi-children.open{display:block;}
+/* Input */
+.input-wrap{padding:12px 20px;border-top:1px solid var(--border);background:var(--surface);}
+.input-row{display:flex;gap:8px;align-items:flex-end;}
+textarea{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);font-family:'Noto Sans KR',sans-serif;resize:none;outline:none;min-height:42px;max-height:110px;line-height:1.5;transition:border-color .2s;}
+textarea:focus{border-color:var(--accent);}
+textarea::placeholder{color:var(--text-dim);}
+.send-btn{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:10px;color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:opacity .2s;}
+.send-btn:hover{opacity:.9;}
+.send-btn.stop{background:linear-gradient(135deg,#e53935,#c62828);}
+.hint{font-size:11px;color:var(--text-dim);margin-top:6px;}
 
-  .sb-foot{padding:9px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);line-height:1.5;}
+/* Modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px);}
+.modal-backdrop.open{display:flex;}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:900px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.25);animation:modal-in .2s ease;}
+@keyframes modal-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.modal-title{font-size:16px;font-weight:700;color:var(--text);flex:1;line-height:1.3;}
+.modal-close{width:32px;height:32px;border:none;background:var(--surface2);border-radius:8px;cursor:pointer;font-size:15px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.modal-close:hover{background:var(--error);color:#fff;}
+.modal-body{flex:1;overflow-y:auto;padding:24px 28px;font-size:14px;line-height:1.85;color:var(--text);}
+.modal-body::-webkit-scrollbar{width:5px;}
+.modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.modal-body h1{font-size:22px;font-weight:700;margin:20px 0 10px;border-bottom:2px solid var(--border);padding-bottom:8px;}
+.modal-body h2{font-size:18px;font-weight:700;margin:16px 0 8px;}
+.modal-body h3{font-size:15px;font-weight:600;margin:14px 0 6px;}
+.modal-body h4,.modal-body h5{font-size:13px;font-weight:600;margin:10px 0 4px;}
+.modal-body p{margin-bottom:10px;color:var(--text-muted);}
+.modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:10px;}
+.modal-body li{margin-bottom:4px;color:var(--text-muted);}
+.modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;}
+.modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;}
+.modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text-muted);}
+.modal-body tr:hover td{background:var(--surface2);}
+.modal-body strong,.modal-body b{font-weight:600;color:var(--text);}
+.modal-body code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--gold);}
+.modal-body pre{background:var(--surface2);padding:14px;border-radius:8px;font-size:12px;overflow-x:auto;margin-bottom:12px;border:1px solid var(--border);}
+.modal-body a{color:var(--accent);text-decoration:none;}
+.modal-body a:hover{text-decoration:underline;}
+.modal-body img{max-width:100%;height:auto;border-radius:8px;margin:10px 0;display:block;border:1px solid var(--border);cursor:zoom-in;}
+.modal-body hr{border:none;border-top:2px solid var(--border);margin:16px 0;}
+.modal-body blockquote{border-left:4px solid var(--accent);padding:8px 14px;color:var(--text-muted);margin:10px 0;background:var(--surface2);border-radius:0 6px 6px 0;}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--border);flex-shrink:0;}
+.pp-ask-btn{width:100%;padding:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+.pp-ask-btn:hover{opacity:.9;}
 
-  /* ── Page Modal ── */
-  .modal-backdrop{
-    position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;
-    display:none;align-items:center;justify-content:center;padding:24px;
-    backdrop-filter:blur(3px);
-  }
-  .modal-backdrop.open{display:flex;}
-  .modal-box{
-    background:var(--surface);border:1px solid var(--border);border-radius:16px;
-    width:100%;max-width:900px;max-height:90vh;
-    display:flex;flex-direction:column;overflow:hidden;
-    box-shadow:0 24px 64px rgba(0,0,0,.25);
-    animation:modal-in .2s ease;
-  }
-  @keyframes modal-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
-  .modal-header{
-    padding:16px 20px;border-bottom:1px solid var(--border);
-    display:flex;align-items:center;gap:10px;flex-shrink:0;
-  }
-  .modal-title{font-size:16px;font-weight:700;color:var(--text);flex:1;line-height:1.3;}
-  .modal-close{
-    width:32px;height:32px;border:none;background:var(--surface2);border-radius:8px;
-    cursor:pointer;font-size:16px;color:var(--text-muted);
-    display:flex;align-items:center;justify-content:center;
-    transition:background .15s,color .15s;flex-shrink:0;
-  }
-  .modal-close:hover{background:var(--error);color:#fff;}
-  .modal-body{
-    flex:1;overflow-y:auto;padding:24px 28px;
-    font-size:14px;line-height:1.85;color:var(--text);
-  }
-  .modal-body::-webkit-scrollbar{width:5px;}
-  .modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-
-  /* Confluence HTML 렌더링 */
-  .modal-body h1{font-size:22px;font-weight:700;margin:20px 0 10px;color:var(--text);border-bottom:2px solid var(--border);padding-bottom:8px;}
-  .modal-body h2{font-size:18px;font-weight:700;margin:18px 0 8px;color:var(--text);}
-  .modal-body h3{font-size:15px;font-weight:600;margin:14px 0 6px;color:var(--text);}
-  .modal-body h4,.modal-body h5{font-size:14px;font-weight:600;margin:10px 0 5px;color:var(--text);}
-  .modal-body p{margin-bottom:10px;color:var(--text-muted);}
-  .modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:10px;}
-  .modal-body li{margin-bottom:4px;color:var(--text-muted);}
-  .modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;}
-  .modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;color:var(--text);}
-  .modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text-muted);}
-  .modal-body tr:hover td{background:var(--surface2);}
-  .modal-body strong,.modal-body b{font-weight:600;color:var(--text);}
-  .modal-body em{font-style:italic;color:var(--text-muted);}
-  .modal-body code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:2px 7px;border-radius:4px;font-size:12px;color:var(--gold);}
-  .modal-body pre{background:var(--surface2);padding:14px 16px;border-radius:8px;font-size:12px;overflow-x:auto;margin-bottom:12px;border:1px solid var(--border);}
-  .modal-body a{color:var(--accent);text-decoration:none;}
-  .modal-body a:hover{text-decoration:underline;}
-  .modal-body img{
-    max-width:100%;height:auto;border-radius:8px;margin:10px 0;
-    display:block;border:1px solid var(--border);
-    cursor:zoom-in;transition:transform .15s;
-  }
-  .modal-body img:hover{transform:scale(1.01);}
-  .modal-body hr{border:none;border-top:2px solid var(--border);margin:18px 0;}
-  .modal-body blockquote{border-left:4px solid var(--accent);padding:8px 14px;color:var(--text-muted);margin:10px 0;background:var(--surface2);border-radius:0 6px 6px 0;}
-  .modal-body .confluence-information-macro{display:none;}
-
-  .modal-footer{padding:12px 20px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:8px;}
-  .pp-ask-btn{flex:1;padding:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;
-    transition:opacity .2s;}
-  .pp-ask-btn:hover{opacity:.9;}
-
-  /* 이미지 확대 뷰어 */
-  .img-viewer{
-    position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;
-    display:none;align-items:center;justify-content:center;cursor:zoom-out;
-  }
-  .img-viewer.open{display:flex;}
-  .img-viewer img{max-width:92vw;max-height:92vh;border-radius:8px;object-fit:contain;}
-
-  /* ── Chat ── */
-  .chat{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-  .msgs{flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:16px;}
-  .msgs::-webkit-scrollbar{width:3px;}
-  .msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-
-  .welcome{text-align:center;padding:40px 20px;color:var(--text-muted);}
-  .welcome h3{font-size:17px;color:var(--text);margin-bottom:8px;}
-  .welcome p{font-size:13px;line-height:1.7;margin-bottom:20px;}
-  .chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;}
-  .chip{padding:6px 13px;background:var(--surface2);border:1px solid var(--border);
-    border-radius:20px;font-size:12px;color:var(--text-muted);cursor:pointer;
-    transition:background .15s,color .15s,border-color .15s;}
-  .chip:hover{background:rgba(58,111,247,.1);border-color:var(--accent);color:var(--accent);}
-
-  .msg{display:flex;gap:9px;align-items:flex-start;}
-  .msg.user{flex-direction:row-reverse;}
-  .avatar{width:29px;height:29px;border-radius:8px;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;font-size:13px;}
-  .msg.ai .avatar{background:linear-gradient(135deg,var(--accent),var(--accent2));}
-  .msg.user .avatar{background:var(--surface2);border:1px solid var(--border);}
-  .bubble{max-width:76%;background:var(--surface);border:1px solid var(--border);
-    border-radius:12px;padding:11px 14px;font-size:14px;line-height:1.75;box-shadow:var(--shadow);}
-  .msg.user .bubble{background:linear-gradient(135deg,rgba(58,111,247,.1),rgba(107,68,248,.06));
-    border-color:rgba(58,111,247,.22);}
-  .bubble p{margin-bottom:7px;}.bubble p:last-child{margin-bottom:0;}
-  .bubble ul,.bubble ol{padding-left:18px;margin-bottom:7px;}
-  .bubble li{margin-bottom:2px;}
-  .bubble strong{color:var(--accent);font-weight:600;}
-  .bubble code{font-family:'JetBrains Mono',monospace;background:var(--surface2);
-    padding:1px 5px;border-radius:4px;font-size:12px;color:var(--gold);}
-  .bubble h3,.bubble h4{margin:10px 0 5px;font-weight:600;}
-  .bubble h3:first-child,.bubble h4:first-child{margin-top:0;}
-
-  .typing{display:flex;gap:4px;align-items:center;padding:3px 0;}
-  .typing span{width:5px;height:5px;border-radius:50%;background:var(--text-muted);animation:bob 1.2s infinite;}
-  .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
-  @keyframes bob{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
-
-  .input-wrap{padding:12px 20px;border-top:1px solid var(--border);background:var(--surface);}
-  .input-row{display:flex;gap:8px;align-items:flex-end;}
-  textarea{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;
-    padding:10px 13px;font-size:14px;color:var(--text);font-family:'Noto Sans KR',sans-serif;
-    resize:none;outline:none;min-height:42px;max-height:110px;line-height:1.5;
-    transition:border-color .2s,background .25s;}
-  textarea:focus{border-color:var(--accent);}
-  textarea::placeholder{color:var(--text-dim);}
-  .send-btn{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    border:none;border-radius:10px;color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;transition:opacity .2s,transform .1s;}
-  .send-btn:hover{opacity:.9;}.send-btn:active{transform:scale(.95);}.send-btn:disabled{opacity:.3;cursor:not-allowed;}
-  .send-btn.stop{background:linear-gradient(135deg,#e53935,#c62828);}
-  .send-btn.stop:hover{opacity:.85;}
-  .hint{font-size:11px;color:var(--text-dim);margin-top:6px;}
-
-  /* ── Overlay ── */
-  #overlay{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
-    justify-content:center;gap:14px;z-index:50;background:rgba(244,246,251,.95);}
-  [data-theme="dark"] #overlay{background:rgba(13,15,20,.96);}
-  .spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);
-    border-radius:50%;animation:spin .8s linear infinite;}
-  @keyframes spin{to{transform:rotate(360deg);}}
-  .ov-text{font-size:14px;color:var(--text-muted);}
-  .ov-sub{font-size:12px;color:var(--text-dim);margin-top:-6px;max-width:300px;text-align:center;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .prog-wrap{width:240px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
-  .prog{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .35s ease;}
+/* Image Viewer */
+.img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:300;display:none;align-items:center;justify-content:center;cursor:zoom-out;}
+.img-viewer.open{display:flex;}
+.img-viewer img{max-width:92vw;max-height:92vh;border-radius:8px;object-fit:contain;}
 </style>
 </head>
 <body>
 
+<!-- Overlay -->
 <div id="overlay">
   <div class="spinner"></div>
   <div class="ov-text" id="ov-text">Confluence 연결 중...</div>
@@ -265,17 +167,18 @@
   <div class="ov-sub" id="ov-sub"></div>
 </div>
 
+<!-- Header -->
 <header>
-  <div class="hd-left"></div>
+  <div></div>
   <div class="hd-center">
     <div class="logo">⚔</div>
-    <div class="hd-texts">
+    <div>
       <div class="hd-title">ArcheAge WAR · 기획서 AI</div>
       <div class="hd-sub">Confluence 기반 질의응답 시스템</div>
     </div>
   </div>
   <div class="hd-right">
-    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="테마 전환">🌙</button>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">🌙</button>
     <div class="status-pill">
       <div class="dot" id="dot"></div>
       <span id="st-text">대기중</span>
@@ -306,8 +209,8 @@
       <label>Confluence Base URL</label>
       <input id="f-base" type="text" value="https://xlgames-jira.atlassian.net">
     </div>
-    <button class="btn" id="conn-btn" onclick="connect()">🚀 기획서 불러오기</button>
-    <div class="err" id="err"></div>
+    <button class="conn-btn" id="conn-btn" onclick="connectConfluence()">🚀 기획서 불러오기</button>
+    <div class="err-box" id="err-box"></div>
   </div>
 </div>
 
@@ -329,7 +232,7 @@
       </div>
       <div class="input-wrap">
         <div class="input-row">
-          <textarea id="q-input" placeholder="기획서에 대해 질문해보세요... (Enter: 전송 / Shift+Enter: 줄바꿈)" rows="1"></textarea>
+          <textarea id="q-input" placeholder="기획서에 대해 질문해보세요... (Enter: 전송, Shift+Enter: 줄바꿈)" rows="1"></textarea>
           <button class="send-btn" id="send-btn" onclick="handleSendBtn()">↑</button>
         </div>
         <div class="hint">로드된 Confluence 기획서 전체 내용을 바탕으로 답변합니다</div>
@@ -338,231 +241,219 @@
   </div>
 </div>
 
-<!-- 이미지 확대 뷰어 (body 최상위) -->
-<div class="img-viewer" id="img-viewer" onclick="closeImgViewer()">
-  <img id="img-viewer-img" src="" alt="">
-</div>
-
-<!-- 페이지 내용 모달 (body 최상위) -->
-<div class="modal-backdrop" id="page-modal" onclick="onModalBackdropClick(event)">
+<!-- 페이지 모달 -->
+<div class="modal-backdrop" id="page-modal" onclick="onBackdropClick(event)">
   <div class="modal-box">
     <div class="modal-header">
-      <span class="modal-title" id="pp-title">페이지 내용</span>
-      <button class="modal-close" onclick="closePanel()" title="닫기">✕</button>
+      <span class="modal-title" id="modal-title">페이지 내용</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <div class="modal-body" id="pp-body"></div>
+    <div class="modal-body" id="modal-body"></div>
     <div class="modal-footer">
-      <button class="pp-ask-btn" id="pp-ask-btn">💬 이 페이지에 대해 질문하기</button>
+      <button class="pp-ask-btn" id="modal-ask-btn">💬 이 페이지에 대해 질문하기</button>
     </div>
   </div>
 </div>
 
+<!-- 이미지 뷰어 -->
+<div class="img-viewer" id="img-viewer" onclick="closeImgViewer()">
+  <img id="img-viewer-img" src="" alt="">
+</div>
+
 <script>
-const API = '';
-let ctx = '';
-let busy = false;
-let pageStore = {};
-let creds = {};
-
-const CACHE_KEY = 'confluence_cache';
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24시간
-
-function saveCache(space, base, pages, loaded) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ space, base, savedAt: Date.now(), pages, loaded }));
-  } catch(e) { console.warn('캐시 저장 실패:', e); }
-}
-
-function loadCache(space, base) {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (data.space !== space || data.base !== base) return null;
-    if (Date.now() - data.savedAt > CACHE_TTL) return null;
-    return data;
-  } catch(e) { return null; }
-}
-
-function clearCache() { localStorage.removeItem(CACHE_KEY); }
-
-function cacheAge(savedAt) {
-  const diff = Date.now() - savedAt;
-  const h = Math.floor(diff / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  return h > 0 ? h + '시간 ' + m + '분 전 캐시' : m + '분 전 캐시';
-}
+// ── 전역 상태 ──
+var API = '';
+var ctx = '';
+var busy = false;
+var abortCtrl = null;
+var pageStore = {};
+var creds = {};
+var CACHE_KEY = 'confluence_cache';
+var CREDS_KEY = 'confluence_creds';
+var CACHE_TTL = 24 * 60 * 60 * 1000;
 
 // ── 테마 ──
 function toggleTheme() {
-  const html = document.documentElement;
-  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  var html = document.documentElement;
+  var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', next);
   document.getElementById('theme-btn').textContent = next === 'dark' ? '☀️' : '🌙';
   localStorage.setItem('theme', next);
 }
-(function(){
-  const s = localStorage.getItem('theme') || 'light';
-  document.documentElement.setAttribute('data-theme', s);
-  document.getElementById('theme-btn').textContent = s === 'dark' ? '☀️' : '🌙';
-})();
 
-
-
-function showOv(t,p,s){
-  document.getElementById('overlay').style.display='flex';
-  document.getElementById('ov-text').textContent=t;
-  document.getElementById('prog').style.width=p+'%';
-  document.getElementById('ov-sub').textContent=s||'';
+// ── 오버레이 ──
+function showOv(t, p, s) {
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('ov-text').textContent = t;
+  document.getElementById('prog').style.width = (p || 0) + '%';
+  document.getElementById('ov-sub').textContent = s || '';
 }
-function hideOv(){document.getElementById('overlay').style.display='none';}
-function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function hideOv() { document.getElementById('overlay').style.display = 'none'; }
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
-// ── Connect ──
-async function connect(){
-  const email=document.getElementById('f-email').value.trim();
-  const token=document.getElementById('f-token').value.trim();
-  const space=document.getElementById('f-space').value.trim();
-  const base=document.getElementById('f-base').value.trim().replace(/\/$/,'');
-  if(!email||!token) return showErr('이메일과 API 토큰을 입력해주세요.');
+// ── 에러 표시 ──
+function showErr(msg) {
+  var el = document.getElementById('err-box');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
 
-  creds = { email, token, base };
+// ── 캐시 ──
+function saveCache(space, base, pages, loaded) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ space: space, base: base, savedAt: Date.now(), pages: pages, loaded: loaded })); }
+  catch(e) { console.warn('캐시 저장 실패:', e); }
+}
+function getCache(space, base) {
+  try {
+    var raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    var d = JSON.parse(raw);
+    if (d.space !== space || d.base !== base) return null;
+    if (Date.now() - d.savedAt > CACHE_TTL) return null;
+    return d;
+  } catch(e) { return null; }
+}
+function clearCache() { localStorage.removeItem(CACHE_KEY); }
+function cacheAge(savedAt) {
+  var diff = Date.now() - savedAt;
+  var h = Math.floor(diff / 3600000);
+  var m = Math.floor((diff % 3600000) / 60000);
+  return h > 0 ? h + '시간 ' + m + '분 전 캐시' : m + '분 전 캐시';
+}
 
-  // 자격증명 저장 (다음 접속 시 자동 입력용)
-  localStorage.setItem('confluence_creds', JSON.stringify({ email, token, space, base }));
+// ── Confluence 연결 ──
+async function connectConfluence() {
+  var email = document.getElementById('f-email').value.trim();
+  var token = document.getElementById('f-token').value.trim();
+  var space = document.getElementById('f-space').value.trim();
+  var base  = document.getElementById('f-base').value.trim().replace(/\/$/, '');
 
-  const btn=document.getElementById('conn-btn');
-  btn.disabled=true; btn.textContent='연결 중...';
-  document.getElementById('err').style.display='none';
+  if (!email || !token) { showErr('이메일과 API 토큰을 입력해주세요.'); return; }
+  document.getElementById('err-box').style.display = 'none';
 
-  // ── 캐시 확인 ──
-  const cached = loadCache(space, base);
-  if(cached){
-    showOv('캐시 데이터 불러오는 중...',80,'');
-    cached.loaded.forEach(p=>{
-      pageStore[p.id]={title:p.title,content:p.content,html:p.html||''};
+  creds = { email: email, token: token, base: base };
+  localStorage.setItem(CREDS_KEY, JSON.stringify({ email: email, token: token, space: space, base: base }));
+
+  var btn = document.getElementById('conn-btn');
+  btn.disabled = true;
+  btn.textContent = '연결 중...';
+
+  // 캐시 확인
+  var cached = getCache(space, base);
+  if (cached) {
+    showOv('캐시 데이터 불러오는 중...', 85, '');
+    cached.loaded.forEach(function(p) {
+      pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
     });
-    ctx = cached.loaded.map(p=>'=== ['+p.title+'] ===\n'+p.content.substring(0,3000)).join('\n\n');
-    showOv('캐시에서 로드 완료!',100,'');
+    ctx = cached.loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 3000); }).join('\n\n');
+    showOv('완료!', 100, '');
     await sleep(300);
     hideOv();
     showMain(cached.pages, cached.loaded, cached.savedAt);
     return;
   }
 
-  showOv('서버에 연결 중...',5);
-
-  try{
-    showOv('페이지 목록 불러오는 중...',15,'Space: '+space);
-    const pRes=await fetch(API+'/api/pages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email,token,baseUrl:base,spaceKey:space})
+  // 신규 로딩
+  showOv('페이지 목록 불러오는 중...', 10, 'Space: ' + space);
+  try {
+    var pRes = await fetch(API + '/api/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, token: token, baseUrl: base, spaceKey: space })
     });
-    const pData=await pRes.json();
-    if(!pRes.ok) throw new Error(pData.error||'페이지 목록 조회 실패');
-    if(!pData.pages.length) throw new Error('페이지를 찾지 못했어요.');
+    var pData = await pRes.json();
+    if (!pRes.ok) throw new Error(pData.error || '페이지 목록 조회 실패');
+    if (!pData.pages || !pData.pages.length) throw new Error('페이지를 찾지 못했어요.');
 
-    const pages = pData.pages;
-    const total = pages.length;
-    let loaded = [];
+    var pages = pData.pages;
+    var total = pages.length;
+    var loaded = [];
 
-    // 병렬 배치 로딩 (5개씩, 제한 없이 전체)
-    for(let i=0;i<total;i+=5){
-      const batch = pages.slice(i, Math.min(i+5, total));
-      const pct = 20 + Math.round((i/total)*70);
-      showOv('페이지 읽는 중 ('+(i+1)+'/'+total+')', pct, batch[0]?.title||'');
+    for (var i = 0; i < total; i += 5) {
+      var batch = pages.slice(i, Math.min(i + 5, total));
+      var pct = 15 + Math.round((i / total) * 75);
+      showOv('페이지 읽는 중 (' + (i + 1) + '/' + total + ')', pct, batch[0] ? batch[0].title : '');
 
-      const results = await Promise.allSettled(batch.map(pg =>
-        fetch(API+'/api/page-content',{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({email,token,baseUrl:base,pageId:pg.id})
-        }).then(r=>r.json()).then(d=>({...pg, ...d}))
-      ));
+      var results = await Promise.allSettled(batch.map(function(pg) {
+        return fetch(API + '/api/page-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, token: token, baseUrl: base, pageId: pg.id })
+        }).then(function(r) { return r.json(); }).then(function(d) { return Object.assign({}, pg, d); });
+      }));
 
-      results.forEach(r=>{
-        if(r.status==='fulfilled'&&r.value.success&&r.value.content?.trim()){
-          const v=r.value;
-          pageStore[v.id]={title:v.title,content:v.content,html:v.html||''};
-          loaded.push({id:v.id,title:v.title,depth:v.depth,hasChildren:v.hasChildren,content:v.content,html:v.html||''});
+      results.forEach(function(r) {
+        if (r.status === 'fulfilled' && r.value.success && r.value.content && r.value.content.trim()) {
+          var v = r.value;
+          pageStore[v.id] = { title: v.title, content: v.content, html: v.html || '' };
+          loaded.push({ id: v.id, title: v.title, depth: v.depth, hasChildren: v.hasChildren, content: v.content, html: v.html || '' });
         }
       });
     }
 
-    showOv('캐시 저장 중...',97,'다음 접속부터는 즉시 로드됩니다!');
-    ctx = loaded.map(p=>'=== ['+p.title+'] ===\n'+p.content.substring(0,3000)).join('\n\n');
+    showOv('저장 중...', 97, '다음 접속부터 즉시 로드됩니다!');
+    ctx = loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 3000); }).join('\n\n');
     saveCache(space, base, pages, loaded);
-    showOv('완료!',100,'');
+    showOv('완료!', 100, '');
     await sleep(400);
     hideOv();
     showMain(pages, loaded, null);
-  } catch(e){
+  } catch(e) {
     hideOv();
-    btn.disabled=false; btn.textContent='🚀 기획서 불러오기';
-    showErr('오류: '+e.message);
+    btn.disabled = false;
+    btn.textContent = '🚀 기획서 불러오기';
+    showErr('오류: ' + e.message);
   }
 }
 
-function showErr(msg){
-  const el=document.getElementById('err');
-  el.textContent=msg; el.style.display='block';
-}
+// ── 메인 화면 전환 ──
+function showMain(allPages, loaded, savedAt) {
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+  document.getElementById('dot').className = 'dot on';
+  document.getElementById('st-text').textContent = loaded.length + '개 페이지 로드됨';
 
-// ── 트리 사이드바 구성 ──
-function showMain(allPages, loaded, savedAt){
-  document.getElementById('setup').style.display='none';
-  document.getElementById('main').style.display='block';
-  document.getElementById('dot').className='dot on';
-  document.getElementById('st-text').textContent=loaded.length+'개 페이지 로드됨';
-
-  // 트리 맵 구성
-  const loadedIds = new Set(loaded.map(p=>p.id));
-  const map = {};
-  allPages.forEach(p=>{ map[p.id]={...p,children:[]}; });
-
-  // depth 기반으로 트리 재구성
-  // pages는 DFS 순서로 정렬되어 있으므로 stack으로 부모 추적
-  const roots=[];
-  const stack=[];
-  allPages.forEach(p=>{
-    const node=map[p.id];
-    while(stack.length>0&&stack[stack.length-1].depth>=p.depth) stack.pop();
-    if(stack.length===0){ roots.push(node); }
-    else{ stack[stack.length-1].children.push(node); }
+  // 사이드바 트리 구성
+  var map = {};
+  allPages.forEach(function(p) { map[p.id] = Object.assign({}, p, { children: [] }); });
+  var roots = [];
+  var stack = [];
+  allPages.forEach(function(p) {
+    var node = map[p.id];
+    while (stack.length > 0 && stack[stack.length-1].depth >= p.depth) stack.pop();
+    if (stack.length === 0) { roots.push(node); }
+    else { stack[stack.length-1].children.push(node); }
     stack.push(node);
   });
 
-  const list=document.getElementById('page-list');
-  list.innerHTML='';
+  var loadedIds = new Set(loaded.map(function(p) { return p.id; }));
+  var list = document.getElementById('page-list');
+  list.innerHTML = '';
 
-  function renderNode(node, container){
-    const hasLoaded = loadedIds.has(node.id);
-    const hasChildren = node.children.length>0;
+  function renderNode(node, container) {
+    var hasLoaded = loadedIds.has(node.id);
+    var hasChildren = node.children.length > 0;
+    var wrapper = document.createElement('div');
 
-    const wrapper=document.createElement('div');
+    var row = document.createElement('div');
+    row.className = 'pi';
+    if (!hasLoaded) row.style.opacity = '0.45';
 
-    const row=document.createElement('div');
-    row.className='pi';
-    if(!hasLoaded) row.style.opacity='0.5';
+    var indent = document.createElement('div');
+    indent.className = 'pi-indent';
+    indent.style.width = (node.depth * 12) + 'px';
 
-    // 들여쓰기
-    const indent=document.createElement('div');
-    indent.style.width=(node.depth*12)+'px';
-    indent.style.flexShrink='0';
+    var toggle = document.createElement('div');
+    toggle.className = 'pi-toggle';
+    if (hasChildren) toggle.textContent = '▶';
 
-    // 토글 버튼
-    const toggle=document.createElement('div');
-    toggle.className='pi-toggle';
-    if(hasChildren){ toggle.textContent='▶'; }
+    var icon = document.createElement('span');
+    icon.className = 'pi-icon';
+    icon.textContent = hasChildren ? '📁' : '📄';
 
-    // 아이콘
-    const icon=document.createElement('span');
-    icon.className='pi-icon';
-    icon.textContent=hasChildren?'📁':'📄';
-
-    // 라벨
-    const label=document.createElement('span');
-    label.className='pi-label';
-    label.textContent=node.title;
+    var label = document.createElement('span');
+    label.className = 'pi-label';
+    label.textContent = node.title;
 
     row.appendChild(indent);
     row.appendChild(toggle);
@@ -570,292 +461,249 @@ function showMain(allPages, loaded, savedAt){
     row.appendChild(label);
     wrapper.appendChild(row);
 
-    // 자식 컨테이너
-    let childContainer=null;
-    if(hasChildren){
-      childContainer=document.createElement('div');
-      childContainer.className='pi-children';
-      node.children.forEach(child=>renderNode(child, childContainer));
+    var childContainer = null;
+    if (hasChildren) {
+      childContainer = document.createElement('div');
+      childContainer.className = 'pi-children';
+      node.children.forEach(function(child) { renderNode(child, childContainer); });
       wrapper.appendChild(childContainer);
 
-      toggle.onclick=(e)=>{
+      toggle.addEventListener('click', function(e) {
         e.stopPropagation();
-        const isOpen=childContainer.classList.contains('open');
-        childContainer.classList.toggle('open',!isOpen);
-        toggle.classList.toggle('open',!isOpen);
-        icon.textContent=(!isOpen)?'📂':'📁';
-      };
-      row.onclick=(e)=>{
-        if(e.target===toggle) return;
-        if(hasLoaded) openPanel(node.id);
-        // 클릭 시 자동 펼치기
-        childContainer.classList.toggle('open',true);
-        toggle.classList.toggle('open',true);
-        icon.textContent='📂';
-      };
+        var isOpen = childContainer.classList.contains('open');
+        childContainer.classList.toggle('open', !isOpen);
+        toggle.classList.toggle('open', !isOpen);
+        icon.textContent = !isOpen ? '📂' : '📁';
+      });
+      row.addEventListener('click', function(e) {
+        if (e.target === toggle) return;
+        childContainer.classList.add('open');
+        toggle.classList.add('open');
+        icon.textContent = '📂';
+        if (hasLoaded) openModal(node.id);
+      });
     } else {
-      row.onclick=()=>{ if(hasLoaded) openPanel(node.id); };
+      row.addEventListener('click', function() {
+        if (hasLoaded) openModal(node.id);
+      });
     }
-
     container.appendChild(wrapper);
   }
 
-  roots.forEach(r=>renderNode(r, list));
-  const foot = document.getElementById('sb-foot');
-  const ageStr = savedAt ? ' · '+cacheAge(savedAt) : ' · 방금 로드됨';
-  foot.innerHTML = '총 '+loaded.length+'개 페이지'+ageStr+
-    ' <span id="clear-cache" style="cursor:pointer;color:var(--accent);margin-left:4px;" title="캐시 초기화 후 새로 불러오기">↺ 새로고침</span>';
-  document.getElementById('clear-cache').onclick = ()=>{
-    if(confirm('캐시를 삭제하고 다시 불러올까요?\n(새로운 페이지가 추가된 경우 사용하세요)')){
-      clearCache();
-      location.reload();
-    }
-  };
+  roots.forEach(function(r) { renderNode(r, list); });
 
-  const suggestions=['주요 게임 시스템을 요약해줘','전투 관련 기획 내용은?','어떤 페이지들이 있어?','핵심 수치·밸런스 데이터는?','콘텐츠 로드맵 알려줘'];
-  const chips=document.getElementById('chips');
-  suggestions.forEach(s=>{
-    const c=document.createElement('div');
-    c.className='chip'; c.textContent=s;
-    c.onclick=()=>{ document.getElementById('q-input').value=s; send(); };
+  // 하단 정보
+  var foot = document.getElementById('sb-foot');
+  var ageStr = savedAt ? ' · ' + cacheAge(savedAt) : ' · 방금 로드됨';
+  foot.innerHTML = '총 ' + loaded.length + '개 페이지' + ageStr +
+    ' <span style="cursor:pointer;color:var(--accent);margin-left:4px;" id="refresh-btn">↺ 새로고침</span>';
+  document.getElementById('refresh-btn').addEventListener('click', function() {
+    if (confirm('캐시를 삭제하고 다시 불러올까요?')) { clearCache(); location.reload(); }
+  });
+
+  // 추천 질문
+  var chips = document.getElementById('chips');
+  ['주요 게임 시스템을 요약해줘','전투 관련 기획 내용은?','어떤 페이지들이 있어?','핵심 수치·밸런스 데이터는?','콘텐츠 로드맵 알려줘'].forEach(function(s) {
+    var c = document.createElement('div');
+    c.className = 'chip'; c.textContent = s;
+    c.addEventListener('click', function() { document.getElementById('q-input').value = s; sendMsg(); });
     chips.appendChild(c);
   });
 }
 
-// ── 페이지 모달 ──
-function openPanel(id){
-  const pg=pageStore[id];
-  if(!pg) return;
+// ── 모달 ──
+function openModal(id) {
+  var pg = pageStore[id];
+  if (!pg) return;
 
-  document.querySelectorAll('.pi').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.pi').forEach(r=>{
-    if(r.querySelector('.pi-label')?.textContent===pg.title) r.classList.add('active');
+  document.querySelectorAll('.pi').forEach(function(x) { x.classList.remove('active'); });
+  document.querySelectorAll('.pi-label').forEach(function(el) {
+    if (el.textContent === pg.title) el.closest('.pi').classList.add('active');
   });
 
-  document.getElementById('pp-title').textContent=pg.title;
-  const body=document.getElementById('pp-body');
+  document.getElementById('modal-title').textContent = pg.title;
+  var body = document.getElementById('modal-body');
 
-  if(pg.html){
-    let html=pg.html;
-    // 상대 경로 이미지 → 절대 경로
-    html=html.replace(/src="\/wiki\//g,'src="'+creds.base+'/wiki/');
-    // Confluence 인증이 필요한 이미지에 토큰 추가
-    body.innerHTML=html;
-    // 링크 새 탭
-    body.querySelectorAll('a').forEach(a=>{a.target='_blank';a.rel='noopener';});
-    // 불필요 매크로 숨김
-    body.querySelectorAll('.conf-macro,.confluence-information-macro,[data-macro-name]').forEach(el=>{
-      if(el.textContent.trim().length<3) el.style.display='none';
+  if (pg.html) {
+    var html = pg.html.replace(/src="\/wiki\//g, 'src="' + creds.base + '/wiki/');
+    body.innerHTML = html;
+    body.querySelectorAll('a').forEach(function(a) { a.target = '_blank'; a.rel = 'noopener'; });
+    body.querySelectorAll('.confluence-information-macro,[data-macro-name]').forEach(function(el) {
+      if (el.textContent.trim().length < 3) el.style.display = 'none';
     });
-    // 이미지 클릭 시 확대
-    body.querySelectorAll('img').forEach(img=>{
-      img.loading='lazy';
-      img.style.cursor='zoom-in';
-      img.onclick=(e)=>{
-        e.stopPropagation();
-        openImgViewer(img.src);
-      };
-      // 인증 필요한 Confluence 이미지 처리
-      img.onerror=()=>{ img.style.display='none'; };
+    body.querySelectorAll('img').forEach(function(img) {
+      img.loading = 'lazy';
+      img.onerror = function() { img.style.display = 'none'; };
+      img.addEventListener('click', function(e) { e.stopPropagation(); openImgViewer(img.src); });
     });
   } else {
-    body.innerHTML='<p style="color:var(--text-muted);white-space:pre-wrap">'+
-      (pg.content||'내용 없음')+'</p>';
+    body.innerHTML = '<p style="white-space:pre-wrap;color:var(--text-muted)">' + (pg.content || '내용 없음') + '</p>';
   }
 
   document.getElementById('page-modal').classList.add('open');
-  document.body.style.overflow='hidden';
+  document.body.style.overflow = 'hidden';
 
-  document.getElementById('pp-ask-btn').onclick=()=>{
-    closePanel();
-    document.getElementById('q-input').value='"'+pg.title+'" 페이지 내용을 자세히 설명해줘';
-    const welcome=document.getElementById('welcome');
-    if(welcome) welcome.remove();
-    send();
+  document.getElementById('modal-ask-btn').onclick = function() {
+    closeModal();
+    document.getElementById('q-input').value = '"' + pg.title + '" 페이지 내용을 자세히 설명해줘';
+    var welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+    sendMsg();
   };
 }
-
-function closePanel(){
+function closeModal() {
   document.getElementById('page-modal').classList.remove('open');
-  document.body.style.overflow='';
-  document.querySelectorAll('.pi').forEach(x=>x.classList.remove('active'));
+  document.body.style.overflow = '';
+  document.querySelectorAll('.pi').forEach(function(x) { x.classList.remove('active'); });
 }
+function onBackdropClick(e) { if (e.target === document.getElementById('page-modal')) closeModal(); }
 
-function onModalBackdropClick(e){
-  if(e.target===document.getElementById('page-modal')) closePanel();
+// ── 이미지 뷰어 ──
+function openImgViewer(src) {
+  document.getElementById('img-viewer-img').src = src;
+  document.getElementById('img-viewer').classList.add('open');
 }
+function closeImgViewer() { document.getElementById('img-viewer').classList.remove('open'); }
 
-// ESC 키로 닫기
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){
-    closePanel();
-    closeImgViewer();
-  }
+// ESC 키
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { closeModal(); closeImgViewer(); }
 });
 
-// ── 이미지 확대 뷰어 ──
-function openImgViewer(src){
-  document.getElementById('img-viewer-img').src=src;
-  document.getElementById('img-viewer').classList.add('open');
-  document.body.style.overflow='hidden';
-}
-function closeImgViewer(){
-  document.getElementById('img-viewer').classList.remove('open');
-}
-
-// ── Chat ──
-let abortCtrl = null;
-
-function handleSendBtn(){
-  if(busy){ stopAnswer(); } else { send(); }
+// ── 채팅 ──
+function handleSendBtn() { if (busy) { stopAnswer(); } else { sendMsg(); } }
+function stopAnswer() { if (abortCtrl) abortCtrl.abort(); }
+function setSendBtn(isStop) {
+  var btn = document.getElementById('send-btn');
+  btn.textContent = isStop ? '■' : '↑';
+  btn.className = isStop ? 'send-btn stop' : 'send-btn';
 }
 
-function stopAnswer(){
-  if(abortCtrl){ abortCtrl.abort(); }
-}
+async function sendMsg() {
+  var input = document.getElementById('q-input');
+  var msg = input.value.trim();
+  if (!msg || busy) return;
+  busy = true; input.value = ''; resize(input);
 
-function setSendBtn(isStop){
-  const btn = document.getElementById('send-btn');
-  if(isStop){
-    btn.textContent = '■';
-    btn.classList.add('stop');
-    btn.disabled = false;
-  } else {
-    btn.textContent = '↑';
-    btn.classList.remove('stop');
-    btn.disabled = false;
-  }
-}
+  var welcome = document.getElementById('welcome');
+  if (welcome) welcome.remove();
 
-async function send(){
-  const input=document.getElementById('q-input');
-  const msg=input.value.trim();
-  if(!msg||busy) return;
-  busy=true; input.value=''; resize(input);
-
-  const welcome=document.getElementById('welcome');
-  if(welcome) welcome.remove();
-
-  addMsg('user',msg);
-  const typEl=addTyping();
-  setSendBtn(true); // 정지 버튼으로 전환
-  document.getElementById('dot').className='dot spin';
-  document.getElementById('st-text').textContent='AI 생각 중...';
+  addMsg('user', msg, false);
+  var typEl = addTyping();
+  setSendBtn(true);
+  document.getElementById('dot').className = 'dot spin';
+  document.getElementById('st-text').textContent = 'AI 생각 중...';
 
   abortCtrl = new AbortController();
-
-  try{
-    const res=await fetch(API+'/api/ask',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+  try {
+    var res = await fetch(API + '/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       signal: abortCtrl.signal,
-      body:JSON.stringify({question:msg,context:ctx})
+      body: JSON.stringify({ question: msg, context: ctx })
     });
-    const data=await res.json();
-    if(!res.ok) throw new Error(data.error||'서버 오류');
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || '서버 오류');
     typEl.remove();
-    addMsg('ai',data.answer,true);
-  } catch(e){
+    addMsg('ai', data.answer, true);
+  } catch(e) {
     typEl.remove();
-    if(e.name==='AbortError'){
-      addMsg('ai','⏹ 답변이 중단되었습니다.');
-    } else {
-      addMsg('ai','❌ 오류: '+e.message);
-    }
+    if (e.name === 'AbortError') { addMsg('ai', '⏹ 답변이 중단되었습니다.', false); }
+    else { addMsg('ai', '❌ 오류: ' + e.message, false); }
   }
-
-  busy=false;
-  abortCtrl=null;
-  setSendBtn(false); // 전송 버튼으로 복구
-  document.getElementById('dot').className='dot on';
-  document.getElementById('st-text').textContent='기획서 로드됨';
+  busy = false; abortCtrl = null;
+  setSendBtn(false);
+  document.getElementById('dot').className = 'dot on';
+  document.getElementById('st-text').textContent = '기획서 로드됨';
 }
 
-function addMsg(role,text,markdown){
-  const msgs=document.getElementById('msgs');
-  const div=document.createElement('div');
-  div.className='msg '+role;
-  const av=document.createElement('div');
-  av.className='avatar';
-  av.textContent=role==='ai'?'⚔':'👤';
-  const bub=document.createElement('div');
-  bub.className='bubble';
-  if(role==='ai'&&markdown){
-    bub.innerHTML=md(text);
-  } else { bub.textContent=text; }
+function addMsg(role, text, markdown) {
+  var msgs = document.getElementById('msgs');
+  var div = document.createElement('div');
+  div.className = 'msg ' + role;
+  var av = document.createElement('div');
+  av.className = 'avatar';
+  av.textContent = role === 'ai' ? '⚔' : '👤';
+  var bub = document.createElement('div');
+  bub.className = 'bubble';
+  if (role === 'ai' && markdown) { bub.innerHTML = mdToHtml(text); }
+  else { bub.textContent = text; }
   div.appendChild(av); div.appendChild(bub);
   msgs.appendChild(div);
-  msgs.scrollTop=msgs.scrollHeight;
+  msgs.scrollTop = msgs.scrollHeight;
   return div;
 }
 
-function addTyping(){
-  const msgs=document.getElementById('msgs');
-  const div=document.createElement('div');
-  div.className='msg ai';
-  div.innerHTML='<div class="avatar">⚔</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+function addTyping() {
+  var msgs = document.getElementById('msgs');
+  var div = document.createElement('div');
+  div.className = 'msg ai';
+  div.innerHTML = '<div class="avatar">⚔</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
   msgs.appendChild(div);
-  msgs.scrollTop=msgs.scrollHeight;
+  msgs.scrollTop = msgs.scrollHeight;
   return div;
 }
 
-function md(t){
+function mdToHtml(t) {
   return t
-    .replace(/^#### (.+)$/gm,'<h4>$1</h4>')
-    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
-    .replace(/^## (.+)$/gm,'<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/`([^`]+)`/g,'<code>$1</code>')
-    .replace(/^- (.+)$/gm,'<li>$1</li>')
-    .replace(/(<li>[^<]*<\/li>\n?)+/g,m=>'<ul>'+m+'</ul>')
+    .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[^<]*<\/li>\n?)+/g, function(m) { return '<ul>' + m + '</ul>'; })
     .split(/\n\n+/)
-    .map(b=>b.trim().startsWith('<')?b:'<p>'+b.replace(/\n/g,' ')+'</p>')
+    .map(function(b) { return b.trim().startsWith('<') ? b : '<p>' + b.replace(/\n/g, ' ') + '</p>'; })
     .join('');
 }
 
-const ta=document.getElementById('q-input');
-ta.addEventListener('input',()=>resize(ta));
-ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
-function resize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,110)+'px';}
+// textarea 자동 크기
+var ta = document.getElementById('q-input');
+ta.addEventListener('input', function() { resize(ta); });
+ta.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+function resize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 110) + 'px'; }
 
-// ── 자동 캐시 로드 (모든 함수 선언 후 실행) ──
-window.addEventListener('DOMContentLoaded', function() {
-  // 저장된 자격증명 복원 (입력창 자동 채우기)
+// ── 초기화 (DOM 로드 후) ──
+window.addEventListener('load', function() {
+  // 테마 적용
+  var savedTheme = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  document.getElementById('theme-btn').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+  // 저장된 자격증명 복원
   try {
-    const c = JSON.parse(localStorage.getItem('confluence_creds') || '{}');
-    if(c.email) document.getElementById('f-email').value = c.email;
-    if(c.token) document.getElementById('f-token').value = c.token;
-    if(c.space) document.getElementById('f-space').value = c.space;
-    if(c.base)  document.getElementById('f-base').value  = c.base;
-  } catch(e) {}
+    var c = JSON.parse(localStorage.getItem(CREDS_KEY) || '{}');
+    if (c.email) document.getElementById('f-email').value = c.email;
+    if (c.token) document.getElementById('f-token').value = c.token;
+    if (c.space) document.getElementById('f-space').value = c.space;
+    if (c.base)  document.getElementById('f-base').value  = c.base;
 
-  // 유효한 캐시가 있으면 자동으로 바로 로드
-  try {
-    const raw = localStorage.getItem('confluence_cache');
-    if(!raw) return;
-    const cached = JSON.parse(raw);
-    if(!cached || !cached.loaded || !cached.pages) return;
-    if(Date.now() - cached.savedAt >= CACHE_TTL) return;
-
-    const c = JSON.parse(localStorage.getItem('confluence_creds') || '{}');
-    creds = { email: c.email||'', token: c.token||'', base: cached.base||'' };
-
-    showOv('캐시 데이터 불러오는 중...', 80, '');
-    setTimeout(async () => {
-      cached.loaded.forEach(p => {
-        pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
-      });
-      ctx = cached.loaded.map(p => '=== [' + p.title + '] ===
-' + p.content.substring(0, 3000)).join('
-
-');
-      showOv('완료!', 100, '');
-      await new Promise(r => setTimeout(r, 300));
-      hideOv();
-      showMain(cached.pages, cached.loaded, cached.savedAt);
-    }, 50);
+    // 유효한 캐시가 있으면 자동 로드
+    var raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      var cached = JSON.parse(raw);
+      if (cached && cached.loaded && cached.pages && (Date.now() - cached.savedAt < CACHE_TTL)) {
+        creds = { email: c.email || '', token: c.token || '', base: cached.base || '' };
+        showOv('캐시 데이터 불러오는 중...', 85, '');
+        setTimeout(async function() {
+          cached.loaded.forEach(function(p) {
+            pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
+          });
+          ctx = cached.loaded.map(function(p) {
+            return '=== [' + p.title + '] ===\n' + p.content.substring(0, 3000);
+          }).join('\n\n');
+          showOv('완료!', 100, '');
+          await sleep(300);
+          hideOv();
+          showMain(cached.pages, cached.loaded, cached.savedAt);
+        }, 50);
+      }
+    }
   } catch(e) {
-    localStorage.removeItem('confluence_cache');
+    localStorage.removeItem(CACHE_KEY);
   }
 });
 </script>

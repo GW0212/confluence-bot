@@ -9,24 +9,24 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았어요.' });
 
-  const prompt = `당신은 ArcheAge WAR 게임의 기획서 전문 AI 어시스턴트입니다.
-아래는 Confluence에서 불러온 실제 기획서 내용입니다. 이 내용을 철저히 분석하고, 사용자의 질문에 기획서 내용을 바탕으로 상세하고 정확하게 답변하세요.
+  const prompt = `너는 ArcheAge WAR 게임 기획서 전문 AI야.
+아래에 Confluence에서 가져온 실제 기획서 원문이 주어져. 이 내용을 100% 기반으로 질문에 답해.
 
-답변 규칙:
-- 기획서에 있는 내용을 우선으로 답변하세요
-- 기획서에 없는 내용이면 "기획서에서 해당 내용을 찾지 못했습니다"라고 명확히 알려주세요
-- 한국어로 답변하세요
-- 필요하면 항목별(## 제목, - 항목)로 정리해서 답변하세요
-- 수치, 데이터가 있으면 정확히 인용하세요
-- 답변 마지막에 참고한 페이지명을 간략히 언급해주세요
+[중요 규칙]
+1. 기획서 원문에 있는 내용은 반드시 상세히 답해. 절대 "찾을 수 없습니다"라고 하지 마.
+2. 기획서 원문에서 관련 키워드가 조금이라도 있으면 그 내용을 모두 찾아서 답해.
+3. 답변할 때 어떤 페이지([페이지명])의 내용인지 출처를 함께 표시해.
+4. 기획서에 정말로 없는 내용만 "기획서에서 찾을 수 없습니다"라고 해.
+5. 한국어로 답해.
+6. 내용이 많으면 ## 제목과 - 항목으로 구조화해서 답해.
+7. 수치나 데이터는 원문 그대로 정확히 인용해.
 
-=== 기획서 내용 ===
-${context.substring(0, 90000)}
+[기획서 원문]
+${context}
 
-=== 사용자 질문 ===
+[질문]
 ${question}`;
 
-  // 2026년 기준 무료 티어 사용 가능한 모델 목록
   const models = [
     'gemini-2.5-flash',
     'gemini-2.0-flash',
@@ -44,7 +44,7 @@ ${question}`;
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
+            generationConfig: { temperature: 0.1, maxOutputTokens: 3000 }
           })
         }
       );

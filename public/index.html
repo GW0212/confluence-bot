@@ -811,10 +811,13 @@ function addTyping() {
 function mdToHtml(t) {
   // 불완전한 [[ 제거
   t = t.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
-  // [[페이지명]] → 링크
+  // [[페이지명]] → 링크 (같은 페이지 중복 제거)
+  var usedPages = {};
   t = t.replace(/\[\[(.+?)\]\]/g, function(_, pn) {
+    var key = pn.trim().toLowerCase();
+    if (usedPages[key]) return ''; // 이미 표시된 페이지 링크는 제거
+    usedPages[key] = true;
     var r = findPageByTitle(pn.trim());
-    var safe = pn.trim().replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     if (r) return '<a class="page-ref" href="#" onclick="event.preventDefault();openModal(\'' + r.id + '\')">📄 '+pn+'</a>';
     return '<span class="page-ref-na">📄 '+pn+'</span>';
   });

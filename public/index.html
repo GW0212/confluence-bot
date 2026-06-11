@@ -151,6 +151,11 @@ textarea::placeholder{color:var(--text-dim);}
 .pp-ask-btn{width:100%;padding:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s;}
 .pp-ask-btn:hover{opacity:.9;}
 
+/* Page Ref Link */
+.page-ref{display:inline-flex;align-items:center;gap:3px;color:var(--accent);background:rgba(58,111,247,.08);border:1px solid rgba(58,111,247,.25);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:500;cursor:pointer;text-decoration:none;transition:background .15s;}
+.page-ref:hover{background:rgba(58,111,247,.18);}
+.page-ref-na{display:inline-flex;align-items:center;gap:3px;color:var(--text-muted);font-size:12px;}
+
 /* Image Viewer */
 .img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:300;display:none;align-items:center;justify-content:center;cursor:zoom-out;}
 .img-viewer.open{display:flex;}
@@ -299,9 +304,13 @@ function showErr(msg) {
 }
 
 // ── 캐시 ──
-function saveCache(space, base, pages, loaded) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ space: space, base: base, savedAt: Date.now(), pages: pages, loaded: loaded })); }
-  catch(e) { console.warn('캐시 저장 실패:', e); }
+function saveCache(space, base, pages, loaded, savedCtx) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ space: space, base: base, savedAt: Date.now(), pages: pages, loaded: loaded, ctx: savedCtx })); }
+  catch(e) {
+    // ctx 제외하고 재시도
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ space: space, base: base, savedAt: Date.now(), pages: pages, loaded: loaded })); }
+    catch(e2) { console.warn('캐시 저장 실패:', e2); }
+  }
 }
 function getCache(space, base) {
   try {
@@ -341,13 +350,18 @@ async function connectConfluence() {
   // 캐시 확인
   var cached = getCache(space, base);
   if (cached) {
-    showOv('캐시 데이터 불러오는 중...', 85, '');
+    showOv('캐시 데이터 불러오는 중...', 90, '');
     cached.loaded.forEach(function(p) {
-      pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
+      pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '', pageUrl: p.pageUrl || '' };
     });
-    ctx = cached.loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500); }).join('\n\n');
+    // 저장된 ctx가 있으면 바로 사용, 없으면 재계산
+    if (cached.ctx) {
+      ctx = cached.ctx;
+    } else {
+      ctx = cached.loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500); }).join('\n\n');
+    }
     showOv('완료!', 100, '');
-    await sleep(300);
+    await sleep(150);
     hideOv();
     showMain(cached.pages, cached.loaded, cached.savedAt);
     return;
@@ -385,15 +399,15 @@ async function connectConfluence() {
       results.forEach(function(r) {
         if (r.status === 'fulfilled' && r.value.success && r.value.content && r.value.content.trim()) {
           var v = r.value;
-          pageStore[v.id] = { title: v.title, content: v.content, html: v.html || '' };
-          loaded.push({ id: v.id, title: v.title, depth: v.depth, hasChildren: v.hasChildren, content: v.content, html: v.html || '' });
+          pageStore[v.id] = { title: v.title, content: v.content, html: v.html || '', pageUrl: v.pageUrl || '' };
+          loaded.push({ id: v.id, title: v.title, depth: v.depth, hasChildren: v.hasChildren, content: v.content, html: v.html || '', pageUrl: v.pageUrl || '' });
         }
       });
     }
 
     showOv('저장 중...', 97, '다음 접속부터 즉시 로드됩니다!');
     ctx = loaded.map(function(p) { return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500); }).join('\n\n');
-    saveCache(space, base, pages, loaded);
+    saveCache(space, base, pages, loaded, ctx);
     showOv('완료!', 100, '');
     await sleep(400);
     hideOv();
@@ -645,6 +659,14 @@ function addTyping() {
 }
 
 function mdToHtml(t) {
+  // [[페이지명]] → 클릭 가능한 링크로 변환
+  t = t.replace(/\[\[(.+?)\]\]/g, function(_, pageName) {
+    var pg = findPageByTitle(pageName.trim());
+    if (pg) {
+      return '<a class="page-ref" href="#" onclick="event.preventDefault();openModalByTitle(\''+pageName.trim().replace(/'/g,"\\'")+'\')">📄 '+pageName+'</a>';
+    }
+    return '<span class="page-ref-na">📄 '+pageName+'</span>';
+  });
   return t
     .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
@@ -658,6 +680,33 @@ function mdToHtml(t) {
     .join('');
 }
 
+function findPageByTitle(title) {
+  var keys = Object.keys(pageStore);
+  // 완전 일치 우선
+  for (var i = 0; i < keys.length; i++) {
+    if (pageStore[keys[i]].title === title) return pageStore[keys[i]];
+  }
+  // 포함 검색
+  var tl = title.toLowerCase();
+  for (var i = 0; i < keys.length; i++) {
+    if (pageStore[keys[i]].title.toLowerCase().includes(tl)) return pageStore[keys[i]];
+  }
+  return null;
+}
+
+function openModalByTitle(title) {
+  var keys = Object.keys(pageStore);
+  // 완전 일치
+  for (var i = 0; i < keys.length; i++) {
+    if (pageStore[keys[i]].title === title) { openModal(keys[i]); return; }
+  }
+  // 포함 검색
+  var tl = title.toLowerCase();
+  for (var i = 0; i < keys.length; i++) {
+    if (pageStore[keys[i]].title.toLowerCase().includes(tl)) { openModal(keys[i]); return; }
+  }
+}
+
 // textarea 자동 크기
 var ta = document.getElementById('q-input');
 ta.addEventListener('input', function() { resize(ta); });
@@ -667,7 +716,7 @@ ta.addEventListener('keydown', function(e) {
 function resize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 110) + 'px'; }
 
 // ── 초기화 (DOM 로드 후) ──
-window.addEventListener('load', function() {
+window.addEventListener('DOMContentLoaded', function() {
   // 테마 적용
   var savedTheme = localStorage.getItem('theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
@@ -687,19 +736,23 @@ window.addEventListener('load', function() {
       var cached = JSON.parse(raw);
       if (cached && cached.loaded && cached.pages && (Date.now() - cached.savedAt < CACHE_TTL)) {
         creds = { email: c.email || '', token: c.token || '', base: cached.base || '' };
-        showOv('캐시 데이터 불러오는 중...', 85, '');
+        showOv('캐시 데이터 불러오는 중...', 90, '');
         setTimeout(async function() {
           cached.loaded.forEach(function(p) {
-            pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
+            pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '', pageUrl: p.pageUrl || '' };
           });
-          ctx = cached.loaded.map(function(p) {
-            return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500);
-          }).join('\n\n');
+          if (cached.ctx) {
+            ctx = cached.ctx;
+          } else {
+            ctx = cached.loaded.map(function(p) {
+              return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500);
+            }).join('\n\n');
+          }
           showOv('완료!', 100, '');
-          await sleep(300);
+          await sleep(100);
           hideOv();
           showMain(cached.pages, cached.loaded, cached.savedAt);
-        }, 50);
+        }, 10);
       }
     }
   } catch(e) {

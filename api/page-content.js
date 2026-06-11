@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   const auth = Buffer.from(`${email}:${token}`).toString('base64');
 
   try {
-    const url = `${baseUrl}/wiki/rest/api/content/${pageId}?expand=body.view,title`;
+    const url = `${baseUrl}/wiki/rest/api/content/${pageId}?expand=body.view,title,space`;
     const response = await fetch(url, {
       headers: { 'Authorization': `Basic ${auth}`, 'Accept': 'application/json' }
     });
@@ -17,8 +17,8 @@ export default async function handler(req, res) {
     if (!response.ok) return res.status(response.status).json({ error: '페이지 로드 실패' });
 
     const data = await response.json();
-    // body.view는 렌더링된 HTML (이미지 제외한 텍스트 추출용)
     const rawHtml = data.body?.view?.value || '';
+
     const text = rawHtml
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/p>/gi, '\n')
@@ -37,10 +37,10 @@ export default async function handler(req, res) {
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    // HTML도 함께 반환 (패널 렌더링용)
-    const html = rawHtml;
+    // Confluence 페이지 직접 URL
+    const pageUrl = `${baseUrl}/wiki/spaces/${data.space?.key || ''}/pages/${pageId}`;
 
-    res.json({ success: true, title: data.title, content: text, html });
+    res.json({ success: true, title: data.title, content: text, html: rawHtml, pageUrl });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -335,25 +335,25 @@
         <div class="hint">로드된 Confluence 기획서 전체 내용을 바탕으로 답변합니다</div>
       </div>
     </div>
-
-  <!-- 이미지 확대 뷰어 -->
-  <div class="img-viewer" id="img-viewer" onclick="closeImgViewer()">
-    <img id="img-viewer-img" src="" alt="">
   </div>
+</div>
 
-  <!-- 페이지 내용 모달 -->
-  <div class="modal-backdrop" id="page-modal" onclick="onModalBackdropClick(event)">
-    <div class="modal-box">
-      <div class="modal-header">
-        <span class="modal-title" id="pp-title">페이지 내용</span>
-        <button class="modal-close" onclick="closePanel()" title="닫기">✕</button>
-      </div>
-      <div class="modal-body" id="pp-body"></div>
-      <div class="modal-footer">
-        <button class="pp-ask-btn" id="pp-ask-btn">💬 이 페이지에 대해 질문하기</button>
-      </div>
+<!-- 이미지 확대 뷰어 (body 최상위) -->
+<div class="img-viewer" id="img-viewer" onclick="closeImgViewer()">
+  <img id="img-viewer-img" src="" alt="">
+</div>
+
+<!-- 페이지 내용 모달 (body 최상위) -->
+<div class="modal-backdrop" id="page-modal" onclick="onModalBackdropClick(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="pp-title">페이지 내용</span>
+      <button class="modal-close" onclick="closePanel()" title="닫기">✕</button>
     </div>
-  </div>
+    <div class="modal-body" id="pp-body"></div>
+    <div class="modal-footer">
+      <button class="pp-ask-btn" id="pp-ask-btn">💬 이 페이지에 대해 질문하기</button>
+    </div>
   </div>
 </div>
 

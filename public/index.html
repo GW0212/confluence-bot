@@ -34,9 +34,13 @@ header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;paddin
 
 /* Sidebar Search */
 .sb-search{padding:8px 8px 4px;flex-shrink:0;}
-.sb-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);outline:none;transition:border-color .2s;font-family:'Noto Sans KR',sans-serif;}
+.sb-search-wrap{position:relative;display:flex;align-items:center;}
+.sb-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 28px 7px 10px;font-size:12px;color:var(--text);outline:none;transition:border-color .2s;font-family:'Noto Sans KR',sans-serif;}
 .sb-search input:focus{border-color:var(--accent);}
 .sb-search input::placeholder{color:var(--text-dim);}
+.sb-search-clear{position:absolute;right:6px;width:18px;height:18px;border:none;background:none;color:var(--text-dim);cursor:pointer;font-size:11px;display:none;align-items:center;justify-content:center;border-radius:3px;padding:0;}
+.sb-search-clear:hover{color:var(--text);background:var(--surface2);}
+.sb-search-clear.visible{display:flex;}
 
 /* Search Results */
 #search-results{display:none;flex-direction:column;flex:1;overflow:hidden;}
@@ -161,10 +165,12 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-body p{margin-bottom:10px;color:var(--text-muted);}
 .modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:10px;}
 .modal-body li{margin-bottom:4px;color:var(--text-muted);}
-.modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;}
-.modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;}
-.modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text-muted);}
-.modal-body tr:hover td{background:var(--surface2);}
+.modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;table-layout:auto;word-break:keep-all;}
+.modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:center;white-space:nowrap;color:var(--text);}
+.modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text-muted);text-align:center;vertical-align:middle;}
+.modal-body td:first-child{text-align:left;}
+.modal-body tr:hover td{background:rgba(58,111,247,.04);}
+.modal-body .confluenceTable,.modal-body .wrapped-table{overflow-x:auto;display:block;max-width:100%;}
 .modal-body strong,.modal-body b{font-weight:600;color:var(--text);}
 .modal-body code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--gold);}
 .modal-body pre{background:var(--surface2);padding:14px;border-radius:8px;font-size:12px;overflow-x:auto;margin-bottom:12px;border:1px solid var(--border);}
@@ -253,7 +259,10 @@ textarea::placeholder{color:var(--text-dim);}
     <div class="sidebar">
       <div class="sb-head">📄 로드된 페이지</div>
       <div class="sb-search">
-        <input type="text" id="sb-search-input" placeholder="🔍 페이지 검색..." oninput="searchPages(this.value)">
+        <div class="sb-search-wrap">
+          <input type="text" id="sb-search-input" placeholder="🔍 페이지 검색..." oninput="debouncedSearch(this.value)">
+          <button class="sb-search-clear" id="sb-search-clear" onclick="clearSearch()" title="초기화">✕</button>
+        </div>
       </div>
       <div class="page-list" id="page-list"></div>
       <div id="search-results">
@@ -462,6 +471,7 @@ function showMain(allPages, loaded, savedAt) {
   document.getElementById('dot').className = 'dot on';
   document.getElementById('st-text').textContent = loaded.length + '개 페이지 로드됨';
   allLoadedPages = loaded; // 검색용
+  setTimeout(buildSearchIndex, 100); // 검색 인덱스 비동기 빌드
 
   // 사이드바 트리 구성
   var map = {};
@@ -761,7 +771,42 @@ function goHome() {
 }
 
 // ── 사이드바 검색 ──
-var allLoadedPages = []; // showMain에서 설정
+var allLoadedPages = [];
+var searchTimer = null;
+// 검색용 인덱스 (타이틀 소문자 + 내용 소문자) - showMain 후 미리 빌드
+var searchIndex = [];
+
+function buildSearchIndex() {
+  searchIndex = allLoadedPages.map(function(p) {
+    var pg = pageStore[p.id];
+    if (!pg) return null;
+    return {
+      id: p.id,
+      title: pg.title,
+      titleL: pg.title.toLowerCase(),
+      // 내용은 앞 3000자만 인덱싱 (속도)
+      contentL: pg.content ? pg.content.substring(0, 3000).toLowerCase() : '',
+      content: pg.content ? pg.content.substring(0, 3000) : ''
+    };
+  }).filter(Boolean);
+}
+
+function debouncedSearch(val) {
+  // 초기화 버튼 표시/숨김
+  var clearBtn = document.getElementById('sb-search-clear');
+  if (clearBtn) clearBtn.classList.toggle('visible', val.length > 0);
+  // 300ms debounce
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function() { searchPages(val); }, 300);
+}
+
+function clearSearch() {
+  var input = document.getElementById('sb-search-input');
+  if (input) { input.value = ''; input.focus(); }
+  var clearBtn = document.getElementById('sb-search-clear');
+  if (clearBtn) clearBtn.classList.remove('visible');
+  searchPages('');
+}
 
 function searchPages(query) {
   var pageList = document.getElementById('page-list');
@@ -770,7 +815,6 @@ function searchPages(query) {
   var srCount = document.getElementById('sr-count');
 
   if (!query || query.trim().length < 1) {
-    // 검색창 비우면 트리로 복귀
     pageList.style.display = '';
     searchResults.classList.remove('active');
     return;
@@ -778,55 +822,66 @@ function searchPages(query) {
 
   pageList.style.display = 'none';
   searchResults.classList.add('active');
-  srList.innerHTML = '';
 
   var q = query.toLowerCase();
+  var re = new RegExp('(' + escapeRe(query) + ')', 'gi');
   var results = [];
 
-  allLoadedPages.forEach(function(p) {
-    var pg = pageStore[p.id];
-    if (!pg) return;
-    var titleMatch = pg.title.toLowerCase().includes(q);
-    var contentIdx = pg.content.toLowerCase().indexOf(q);
+  // 인덱스 기반 검색 (빠름)
+  for (var i = 0; i < searchIndex.length; i++) {
+    var idx = searchIndex[i];
+    var titleMatch = idx.titleL.includes(q);
+    var contentIdx = idx.contentL.indexOf(q);
     if (titleMatch || contentIdx >= 0) {
-      results.push({ id: p.id, title: pg.title, content: pg.content, titleMatch: titleMatch, contentIdx: contentIdx });
+      results.push({ id: idx.id, title: idx.title, content: idx.content, titleMatch: titleMatch, contentIdx: contentIdx, re: re });
     }
-  });
+    // 최대 200개만 수집
+    if (results.length >= 200) break;
+  }
 
-  // 제목 일치 우선 정렬
   results.sort(function(a, b) { return (b.titleMatch ? 1 : 0) - (a.titleMatch ? 1 : 0); });
 
   srCount.textContent = results.length > 0 ? '검색 결과 ' + results.length + '개' : '';
 
+  // DOM Fragment로 한번에 삽입 (렉 방지)
+  var frag = document.createDocumentFragment();
+
   if (results.length === 0) {
-    srList.innerHTML = '<div class="sr-empty">검색 결과가 없어요</div>';
-    return;
+    var empty = document.createElement('div');
+    empty.className = 'sr-empty';
+    empty.textContent = '검색 결과가 없어요';
+    frag.appendChild(empty);
+  } else {
+    // 최대 50개만 렌더링
+    results.slice(0, 50).forEach(function(r) {
+      var item = document.createElement('div');
+      item.className = 'sr-item';
+
+      var titleEl = document.createElement('div');
+      titleEl.className = 'sr-title';
+      titleEl.innerHTML = r.title.replace(re, '<mark>$1</mark>');
+
+      item.appendChild(titleEl);
+
+      if (r.contentIdx >= 0) {
+        var start = Math.max(0, r.contentIdx - 40);
+        var end = Math.min(r.content.length, r.contentIdx + 120);
+        var raw = (start > 0 ? '...' : '') + r.content.slice(start, end) + (end < r.content.length ? '...' : '');
+        var snippet = document.createElement('div');
+        snippet.className = 'sr-snippet';
+        snippet.innerHTML = raw.replace(re, '<mark>$1</mark>');
+        item.appendChild(snippet);
+      }
+
+      (function(id) {
+        item.addEventListener('click', function() { openModal(id); });
+      })(r.id);
+      frag.appendChild(item);
+    });
   }
 
-  results.forEach(function(r) {
-    var item = document.createElement('div');
-    item.className = 'sr-item';
-
-    // 제목 하이라이트
-    var titleEl = document.createElement('div');
-    titleEl.className = 'sr-title';
-    titleEl.innerHTML = r.title.replace(new RegExp('(' + escapeRe(query) + ')', 'gi'), '<mark>$1</mark>');
-
-    // 본문 스니펫 하이라이트
-    var snippet = document.createElement('div');
-    snippet.className = 'sr-snippet';
-    if (r.contentIdx >= 0) {
-      var start = Math.max(0, r.contentIdx - 40);
-      var end = Math.min(r.content.length, r.contentIdx + 120);
-      var raw = (start > 0 ? '...' : '') + r.content.slice(start, end) + (end < r.content.length ? '...' : '');
-      snippet.innerHTML = raw.replace(new RegExp('(' + escapeRe(query) + ')', 'gi'), '<mark>$1</mark>');
-    }
-
-    item.appendChild(titleEl);
-    if (r.contentIdx >= 0) item.appendChild(snippet);
-    item.addEventListener('click', function() { openModal(r.id); });
-    srList.appendChild(item);
-  });
+  srList.innerHTML = '';
+  srList.appendChild(frag);
 }
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }

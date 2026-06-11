@@ -9,82 +9,98 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았어요.' });
 
-  // 질문 키워드 기반 점수 정렬
+  // 키워드 기반 관련 페이지 추출
   const pages = [];
-  const chunks = context.split(/(?=\n?=== \[)/);
-  for (const chunk of chunks) {
+  for (const chunk of context.split(/(?=\n?=== \[)/)) {
     const m = chunk.match(/=== \[(.+?)\] ===/);
     if (!m) continue;
-    const title = m[1];
-    const content = chunk.replace(/=== \[.+?\] ===\n?/, '').trim();
-    pages.push({ title, content });
+    pages.push({ title: m[1], content: chunk.replace(/=== \[.+?\] ===\n?/, '').trim() });
   }
 
   const qLower = question.toLowerCase();
   const qKeywords = qLower.split(/[\s,./()[\]]+/).filter(w => w.length >= 2);
 
   const scored = pages.map(p => {
-    const tl = p.title.toLowerCase();
-    const cl = p.content.toLowerCase();
+    const tl = p.title.toLowerCase(), cl = p.content.toLowerCase();
     let score = 0;
     qKeywords.forEach(kw => {
       if (tl.includes(kw)) score += 5;
-      if (cl.includes(kw)) score += (cl.split(kw).length - 1); // 등장 횟수만큼
+      score += (cl.split(kw).length - 1);
     });
     return { ...p, score };
   }).filter(p => p.score > 0).sort((a, b) => b.score - a.score);
 
-  const relevant = scored.length > 0 ? scored.slice(0, 50) : pages.slice(0, 20);
-
-  // 상위 페이지는 전문, 나머지는 2500자
+  const relevant = scored.length > 0 ? scored.slice(0, 40) : pages.slice(0, 15);
   const filteredCtx = relevant.map((p, i) =>
-    `=== [${p.title}] ===\n${i < 10 ? p.content : p.content.substring(0, 2500)}`
+    `=== [${p.title}] ===\n${i < 8 ? p.content : p.content.substring(0, 2500)}`
   ).join('\n\n');
 
   const prompt = `너는 ArcheAge WAR 게임 기획서 전문 AI야.
 아래 기획서 원문을 바탕으로 질문에 답해.
 
 [핵심 규칙]
-1. 기획서 원문에 있는 내용을 빠짐없이 상세하게 답해. 절대 요약하거나 생략하지 마.
-2. 수치, 공식, 조건, 예외사항까지 전부 포함해서 답해.
-3. 제목/서브제목 뒤에 반드시 [[페이지명]] 형식으로 출처를 표시해.
+1. 기획서 원문에 있는 내용을 빠짐없이 상세하게 답해. 절대 생략하지 마.
+2. 수치, 공식, 조건, 예외사항까지 전부 포함해.
+3. 제목/서브제목 뒤에 반드시 [[페이지명]] 형식으로 출처 표시.
    예: ## 경직 시스템 [[경직]]
-   예: ### 경직 시간 계산 [[경직]]
-4. 여러 페이지에 걸친 내용이면 페이지별로 나눠서 모두 답해.
+4. 여러 페이지에 걸친 내용이면 모두 포함해.
 5. 기획서에 없는 내용만 "기획서에서 찾을 수 없습니다"라고 해.
-6. 한국어로 답해.
-7. 구조: ## 대제목 [[출처]], ### 소제목, - 항목, 수치는 **굵게** 표시.
+6. 한국어로, ## 제목 / ### 소제목 / - 항목 구조로 답해.
+7. 수치는 **굵게** 표시.
 
-[기획서 원문 - ${relevant.length}개 관련 페이지]
+[기획서 원문]
 ${filteredCtx}
 
 [질문]
-${question}
+${question}`;
 
-위 질문에 대해 기획서 내용을 최대한 상세하고 완전하게 답해. 절대 중요한 내용을 빠뜨리지 마.`;
+  // 모델 목록 - rate limit 시 순차 시도 + 대기 후 재시도
+  const models = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash-8b',
+  ];
 
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  let lastError = '';
   for (const model of models) {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.05, maxOutputTokens: 4000 }
-          })
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.05, maxOutputTokens: 4000 }
+            })
+          }
+        );
+        const data = await response.json();
+
+        if (data.error) {
+          // 429 rate limit → 잠깐 기다렸다가 다음 모델
+          if (data.error.code === 429 || data.error.status === 'RESOURCE_EXHAUSTED') {
+            if (attempt === 0) { await sleep(2000); continue; } // 2초 후 한 번 더
+            break; // 다음 모델로
+          }
+          throw new Error(data.error.message);
         }
-      );
-      const data = await response.json();
-      if (data.error) { if (data.error.code === 429) { lastError = data.error.message; continue; } throw new Error(data.error.message); }
-      const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!answer) { lastError = '응답을 받지 못했어요.'; continue; }
-      return res.json({ success: true, answer, model });
-    } catch (e) { lastError = e.message; continue; }
+
+        const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!answer) break;
+        return res.json({ success: true, answer, model });
+      } catch (e) {
+        if (attempt === 1) break;
+        await sleep(1000);
+      }
+    }
   }
-  res.status(500).json({ error: `AI 응답 실패: ${lastError}` });
+
+  // 모든 모델 실패 시 사용자 친화적 메시지
+  return res.status(429).json({
+    error: 'API 요청 한도에 도달했어요. 잠시 후 다시 질문해주세요. (무료 플랜은 분당 요청 횟수 제한이 있어요)'
+  });
 }

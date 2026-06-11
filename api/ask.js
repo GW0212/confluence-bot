@@ -55,11 +55,13 @@ ${filteredCtx}
 ${question}`;
 
   // 모델 목록 - rate limit 시 순차 시도 + 대기 후 재시도
+  // 2026년 6월 기준 무료 티어 사용 가능 모델
+  // gemini-2.0-flash, gemini-2.0-flash-lite는 2026-06-01 종료됨
   const models = [
     'gemini-2.5-flash',
-    'gemini-2.0-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash-8b',
     'gemini-1.5-flash-latest',
-    'gemini-1.5-flash-8b',
   ];
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));

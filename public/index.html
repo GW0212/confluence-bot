@@ -111,56 +111,81 @@
 
   .sb-foot{padding:9px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);line-height:1.5;}
 
-  /* ── Page Panel ── */
-  .page-panel{
-    width:360px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);
-    display:none;flex-direction:column;overflow:hidden;
+  /* ── Page Modal ── */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;
+    display:none;align-items:center;justify-content:center;padding:24px;
+    backdrop-filter:blur(3px);
   }
-  .page-panel.open{display:flex;}
-  .pp-header{
-    padding:11px 14px;border-bottom:1px solid var(--border);
-    display:flex;align-items:center;gap:8px;flex-shrink:0;
+  .modal-backdrop.open{display:flex;}
+  .modal-box{
+    background:var(--surface);border:1px solid var(--border);border-radius:16px;
+    width:100%;max-width:900px;max-height:90vh;
+    display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 24px 64px rgba(0,0,0,.25);
+    animation:modal-in .2s ease;
   }
-  .pp-title{font-size:13px;font-weight:600;color:var(--text);flex:1;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .pp-close{width:26px;height:26px;border:none;background:var(--surface2);border-radius:6px;
-    cursor:pointer;font-size:13px;color:var(--text-muted);display:flex;align-items:center;
-    justify-content:center;transition:background .15s;}
-  .pp-close:hover{background:var(--border);}
-  .pp-body{
-    flex:1;overflow-y:auto;padding:16px;font-size:13px;line-height:1.8;color:var(--text);
+  @keyframes modal-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+  .modal-header{
+    padding:16px 20px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:10px;flex-shrink:0;
   }
-  .pp-body::-webkit-scrollbar{width:3px;}
-  .pp-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  .modal-title{font-size:16px;font-weight:700;color:var(--text);flex:1;line-height:1.3;}
+  .modal-close{
+    width:32px;height:32px;border:none;background:var(--surface2);border-radius:8px;
+    cursor:pointer;font-size:16px;color:var(--text-muted);
+    display:flex;align-items:center;justify-content:center;
+    transition:background .15s,color .15s;flex-shrink:0;
+  }
+  .modal-close:hover{background:var(--error);color:#fff;}
+  .modal-body{
+    flex:1;overflow-y:auto;padding:24px 28px;
+    font-size:14px;line-height:1.85;color:var(--text);
+  }
+  .modal-body::-webkit-scrollbar{width:5px;}
+  .modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
-  /* Confluence HTML 렌더링 스타일 */
-  .pp-body h1,.pp-body h2,.pp-body h3,.pp-body h4,.pp-body h5{
-    font-weight:700;margin:14px 0 6px;color:var(--text);}
-  .pp-body h1{font-size:18px;}.pp-body h2{font-size:16px;}.pp-body h3{font-size:14px;}
-  .pp-body h4,.pp-body h5{font-size:13px;}
-  .pp-body p{margin-bottom:8px;color:var(--text-muted);}
-  .pp-body ul,.pp-body ol{padding-left:18px;margin-bottom:8px;}
-  .pp-body li{margin-bottom:3px;color:var(--text-muted);}
-  .pp-body table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px;}
-  .pp-body th{background:var(--surface2);padding:6px 8px;border:1px solid var(--border);
-    font-weight:600;text-align:left;color:var(--text);}
-  .pp-body td{padding:5px 8px;border:1px solid var(--border);color:var(--text-muted);}
-  .pp-body strong,.pp-body b{font-weight:600;color:var(--text);}
-  .pp-body code{font-family:'JetBrains Mono',monospace;background:var(--surface2);
-    padding:1px 5px;border-radius:3px;font-size:11px;color:var(--gold);}
-  .pp-body pre{background:var(--surface2);padding:10px;border-radius:6px;
-    font-size:11px;overflow-x:auto;margin-bottom:8px;}
-  .pp-body a{color:var(--accent);text-decoration:none;}
-  .pp-body img{max-width:100%;border-radius:4px;margin:4px 0;}
-  .pp-body hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
-  .pp-body blockquote{border-left:3px solid var(--accent);padding-left:10px;
-    color:var(--text-muted);margin:8px 0;}
+  /* Confluence HTML 렌더링 */
+  .modal-body h1{font-size:22px;font-weight:700;margin:20px 0 10px;color:var(--text);border-bottom:2px solid var(--border);padding-bottom:8px;}
+  .modal-body h2{font-size:18px;font-weight:700;margin:18px 0 8px;color:var(--text);}
+  .modal-body h3{font-size:15px;font-weight:600;margin:14px 0 6px;color:var(--text);}
+  .modal-body h4,.modal-body h5{font-size:14px;font-weight:600;margin:10px 0 5px;color:var(--text);}
+  .modal-body p{margin-bottom:10px;color:var(--text-muted);}
+  .modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:10px;}
+  .modal-body li{margin-bottom:4px;color:var(--text-muted);}
+  .modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;}
+  .modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;color:var(--text);}
+  .modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text-muted);}
+  .modal-body tr:hover td{background:var(--surface2);}
+  .modal-body strong,.modal-body b{font-weight:600;color:var(--text);}
+  .modal-body em{font-style:italic;color:var(--text-muted);}
+  .modal-body code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:2px 7px;border-radius:4px;font-size:12px;color:var(--gold);}
+  .modal-body pre{background:var(--surface2);padding:14px 16px;border-radius:8px;font-size:12px;overflow-x:auto;margin-bottom:12px;border:1px solid var(--border);}
+  .modal-body a{color:var(--accent);text-decoration:none;}
+  .modal-body a:hover{text-decoration:underline;}
+  .modal-body img{
+    max-width:100%;height:auto;border-radius:8px;margin:10px 0;
+    display:block;border:1px solid var(--border);
+    cursor:zoom-in;transition:transform .15s;
+  }
+  .modal-body img:hover{transform:scale(1.01);}
+  .modal-body hr{border:none;border-top:2px solid var(--border);margin:18px 0;}
+  .modal-body blockquote{border-left:4px solid var(--accent);padding:8px 14px;color:var(--text-muted);margin:10px 0;background:var(--surface2);border-radius:0 6px 6px 0;}
+  .modal-body .confluence-information-macro{display:none;}
 
-  .pp-footer{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;}
-  .pp-ask-btn{width:100%;padding:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  .modal-footer{padding:12px 20px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:8px;}
+  .pp-ask-btn{flex:1;padding:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));
     border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;
     transition:opacity .2s;}
   .pp-ask-btn:hover{opacity:.9;}
+
+  /* 이미지 확대 뷰어 */
+  .img-viewer{
+    position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;
+    display:none;align-items:center;justify-content:center;cursor:zoom-out;
+  }
+  .img-viewer.open{display:flex;}
+  .img-viewer img{max-width:92vw;max-height:92vh;border-radius:8px;object-fit:contain;}
 
   /* ── Chat ── */
   .chat{flex:1;display:flex;flex-direction:column;overflow:hidden;}
@@ -311,17 +336,24 @@
       </div>
     </div>
 
-    <!-- 페이지 내용 패널 -->
-    <div class="page-panel" id="page-panel">
-      <div class="pp-header">
-        <span class="pp-title" id="pp-title">페이지 내용</span>
-        <button class="pp-close" onclick="closePanel()">✕</button>
+  <!-- 이미지 확대 뷰어 -->
+  <div class="img-viewer" id="img-viewer" onclick="closeImgViewer()">
+    <img id="img-viewer-img" src="" alt="">
+  </div>
+
+  <!-- 페이지 내용 모달 -->
+  <div class="modal-backdrop" id="page-modal" onclick="onModalBackdropClick(event)">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title" id="pp-title">페이지 내용</span>
+        <button class="modal-close" onclick="closePanel()" title="닫기">✕</button>
       </div>
-      <div class="pp-body" id="pp-body"></div>
-      <div class="pp-footer">
+      <div class="modal-body" id="pp-body"></div>
+      <div class="modal-footer">
         <button class="pp-ask-btn" id="pp-ask-btn">💬 이 페이지에 대해 질문하기</button>
       </div>
     </div>
+  </div>
   </div>
 </div>
 
@@ -585,14 +617,13 @@ function showMain(allPages, loaded, savedAt){
   });
 }
 
-// ── 페이지 패널 ──
-async function openPanel(id){
+// ── 페이지 모달 ──
+function openPanel(id){
   const pg=pageStore[id];
   if(!pg) return;
 
   document.querySelectorAll('.pi').forEach(x=>x.classList.remove('active'));
-  const rows=document.querySelectorAll('.pi');
-  rows.forEach(r=>{
+  document.querySelectorAll('.pi').forEach(r=>{
     if(r.querySelector('.pi-label')?.textContent===pg.title) r.classList.add('active');
   });
 
@@ -600,20 +631,35 @@ async function openPanel(id){
   const body=document.getElementById('pp-body');
 
   if(pg.html){
-    // Confluence HTML 렌더링 (이미지 src 수정)
     let html=pg.html;
-    // 상대 경로 이미지를 절대 경로로
+    // 상대 경로 이미지 → 절대 경로
     html=html.replace(/src="\/wiki\//g,'src="'+creds.base+'/wiki/');
+    // Confluence 인증이 필요한 이미지에 토큰 추가
     body.innerHTML=html;
-    // 외부 링크 새 탭 열기
-    body.querySelectorAll('a').forEach(a=>{ a.target='_blank'; a.rel='noopener'; });
-    // Confluence 매크로 등 불필요한 요소 숨기기
-    body.querySelectorAll('.conf-macro,.confluence-information-macro').forEach(el=>el.style.display='none');
+    // 링크 새 탭
+    body.querySelectorAll('a').forEach(a=>{a.target='_blank';a.rel='noopener';});
+    // 불필요 매크로 숨김
+    body.querySelectorAll('.conf-macro,.confluence-information-macro,[data-macro-name]').forEach(el=>{
+      if(el.textContent.trim().length<3) el.style.display='none';
+    });
+    // 이미지 클릭 시 확대
+    body.querySelectorAll('img').forEach(img=>{
+      img.loading='lazy';
+      img.style.cursor='zoom-in';
+      img.onclick=(e)=>{
+        e.stopPropagation();
+        openImgViewer(img.src);
+      };
+      // 인증 필요한 Confluence 이미지 처리
+      img.onerror=()=>{ img.style.display='none'; };
+    });
   } else {
-    body.innerHTML='<p style="color:var(--text-muted);white-space:pre-wrap">'+pg.content+'</p>';
+    body.innerHTML='<p style="color:var(--text-muted);white-space:pre-wrap">'+
+      (pg.content||'내용 없음')+'</p>';
   }
 
-  document.getElementById('page-panel').classList.add('open');
+  document.getElementById('page-modal').classList.add('open');
+  document.body.style.overflow='hidden';
 
   document.getElementById('pp-ask-btn').onclick=()=>{
     closePanel();
@@ -625,8 +671,31 @@ async function openPanel(id){
 }
 
 function closePanel(){
-  document.getElementById('page-panel').classList.remove('open');
+  document.getElementById('page-modal').classList.remove('open');
+  document.body.style.overflow='';
   document.querySelectorAll('.pi').forEach(x=>x.classList.remove('active'));
+}
+
+function onModalBackdropClick(e){
+  if(e.target===document.getElementById('page-modal')) closePanel();
+}
+
+// ESC 키로 닫기
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    closePanel();
+    closeImgViewer();
+  }
+});
+
+// ── 이미지 확대 뷰어 ──
+function openImgViewer(src){
+  document.getElementById('img-viewer-img').src=src;
+  document.getElementById('img-viewer').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeImgViewer(){
+  document.getElementById('img-viewer').classList.remove('open');
 }
 
 // ── Chat ──

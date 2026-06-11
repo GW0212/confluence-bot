@@ -407,49 +407,7 @@ function toggleTheme() {
   document.getElementById('theme-btn').textContent = s === 'dark' ? '☀️' : '🌙';
 })();
 
-// ── 자동 캐시 로드 (페이지 진입 시) ──
-(function(){
-  // 저장된 자격증명 복원
-  const savedCreds = localStorage.getItem('confluence_creds');
-  if(savedCreds){
-    try {
-      const c = JSON.parse(savedCreds);
-      document.getElementById('f-email').value = c.email || '';
-      document.getElementById('f-token').value = c.token || '';
-      document.getElementById('f-space').value = c.space || 'ArcheageM';
-      document.getElementById('f-base').value = c.base || 'https://xlgames-jira.atlassian.net';
-    } catch(e) {}
-  }
 
-  // 캐시가 있으면 자동 로드
-  const savedCacheRaw = localStorage.getItem('confluence_cache');
-  if(savedCacheRaw){
-    try {
-      const cached = JSON.parse(savedCacheRaw);
-      if(cached && cached.loaded && cached.pages && (Date.now() - cached.savedAt < CACHE_TTL)){
-        // 자격증명 복원
-        const c = JSON.parse(localStorage.getItem('confluence_creds') || '{}');
-        creds = { email: c.email||'', token: c.token||'', base: cached.base||'' };
-
-        // 오버레이 표시 후 즉시 로드
-        showOv('캐시 데이터 불러오는 중...', 80, '');
-        setTimeout(async () => {
-          cached.loaded.forEach(p => {
-            pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
-          });
-          ctx = cached.loaded.map(p => '=== [' + p.title + '] ===
-' + p.content.substring(0, 3000)).join('
-
-');
-          showOv('완료!', 100, '');
-          await new Promise(r => setTimeout(r, 300));
-          hideOv();
-          showMain(cached.pages, cached.loaded, cached.savedAt);
-        }, 50);
-      }
-    } catch(e) { localStorage.removeItem('confluence_cache'); }
-  }
-})();
 
 function showOv(t,p,s){
   document.getElementById('overlay').style.display='flex';
@@ -859,6 +817,47 @@ const ta=document.getElementById('q-input');
 ta.addEventListener('input',()=>resize(ta));
 ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 function resize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,110)+'px';}
+
+// ── 자동 캐시 로드 (모든 함수 선언 후 실행) ──
+window.addEventListener('DOMContentLoaded', function() {
+  // 저장된 자격증명 복원 (입력창 자동 채우기)
+  try {
+    const c = JSON.parse(localStorage.getItem('confluence_creds') || '{}');
+    if(c.email) document.getElementById('f-email').value = c.email;
+    if(c.token) document.getElementById('f-token').value = c.token;
+    if(c.space) document.getElementById('f-space').value = c.space;
+    if(c.base)  document.getElementById('f-base').value  = c.base;
+  } catch(e) {}
+
+  // 유효한 캐시가 있으면 자동으로 바로 로드
+  try {
+    const raw = localStorage.getItem('confluence_cache');
+    if(!raw) return;
+    const cached = JSON.parse(raw);
+    if(!cached || !cached.loaded || !cached.pages) return;
+    if(Date.now() - cached.savedAt >= CACHE_TTL) return;
+
+    const c = JSON.parse(localStorage.getItem('confluence_creds') || '{}');
+    creds = { email: c.email||'', token: c.token||'', base: cached.base||'' };
+
+    showOv('캐시 데이터 불러오는 중...', 80, '');
+    setTimeout(async () => {
+      cached.loaded.forEach(p => {
+        pageStore[p.id] = { title: p.title, content: p.content, html: p.html || '' };
+      });
+      ctx = cached.loaded.map(p => '=== [' + p.title + '] ===
+' + p.content.substring(0, 3000)).join('
+
+');
+      showOv('완료!', 100, '');
+      await new Promise(r => setTimeout(r, 300));
+      hideOv();
+      showMain(cached.pages, cached.loaded, cached.savedAt);
+    }, 50);
+  } catch(e) {
+    localStorage.removeItem('confluence_cache');
+  }
+});
 </script>
 </body>
 </html>

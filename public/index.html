@@ -821,16 +821,19 @@ function mdToHtml(t) {
     if (r) return '<a class="page-ref" href="#" onclick="event.preventDefault();openModal(\'' + r.id + '\')">📄 '+pn+'</a>';
     return '<span class="page-ref-na">📄 '+pn+'</span>';
   });
-  return t
-    .replace(/^#### (.+)$/gm,'<h4>$1</h4>')
-    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
-    .replace(/^## (.+)$/gm,'<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/`([^`]+)`/g,'<code>$1</code>')
-    .replace(/^- (.+)$/gm,'<li>$1</li>')
-    .replace(/(<li>[^<]*<\/li>\n?)+/g,function(m){return '<ul>'+m+'</ul>';})
-    .split(/\n\n+/)
-    .map(function(b){return b.trim().startsWith('<')?b:'<p>'+b.replace(/\n/g,' ')+'</p>';})
+  // 마크다운 변환 순서 중요: strong/code 먼저 → h태그 → li → ul묶기
+  t = t.replace(/^#### (.+)$/gm,'<h4>$1</h4>');
+  t = t.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  t = t.replace(/^## (.+)$/gm,'<h3>$1</h3>');
+  t = t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  t = t.replace(/`([^`]+)`/g,'<code>$1</code>');
+  t = t.replace(/^- (.+)$/gm,'<li>$1</li>');
+  // li 묶기: 태그 포함된 li도 처리되도록 .*? 사용
+  t = t.replace(/(<li>.*?<\/li>\n?)+/g, function(m){ return '<ul>'+m+'</ul>'; });
+  // 연속된 ul 병합 (빈 줄로 분리된 경우)
+  t = t.replace(/<\/ul>\s*<ul>/g, '');
+  return t.split(/\n\n+/)
+    .map(function(b){ return b.trim().startsWith('<') ? b : '<p>'+b.replace(/\n/g,' ')+'</p>'; })
     .join('');
 }
 

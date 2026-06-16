@@ -3,5 +3,10 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/public/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/ask.js": { "maxDuration": 30 },
+    "api/pages.js": { "maxDuration": 30 },
+    "api/page-content.js": { "maxDuration": 30 }
+  }
 }

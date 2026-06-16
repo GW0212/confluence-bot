@@ -473,6 +473,7 @@ async function connectConfluence() {
 
     showOv('캐시 저장 중...', 97, '다음 접속부터 즉시 로드됩니다!');
     ctx = loaded.map(function(p){ return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500); }).join('\n\n');
+    if (ctx.length > 3500000) ctx = ctx.substring(0, 3500000); // 요청 크기 제한 대응
     saveCache(space, base, pages, loaded);
     showOv('완료!', 100, '');
     await sleep(300);
@@ -769,12 +770,19 @@ async function sendMsg() {
   document.getElementById('st-text').textContent = 'AI 생각 중...';
   abortCtrl = new AbortController();
   try {
+    // 요청 크기 제한 (Vercel 4.5MB 한도 대응, 안전하게 3MB로 제한)
+    var safeCtx = ctx.length > 3000000 ? ctx.substring(0, 3000000) : ctx;
     var res = await fetch(API + '/api/ask', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       signal: abortCtrl.signal,
-      body: JSON.stringify({ question: msg, context: ctx })
+      body: JSON.stringify({ question: msg, context: safeCtx })
     });
-    var data = await res.json();
+    var rawText = await res.text();
+    var data;
+    try { data = JSON.parse(rawText); }
+    catch(parseErr) {
+      throw new Error('서버 응답 오류 (요청이 너무 커요). 페이지를 새로고침 후 다시 시도해주세요.');
+    }
     if (!res.ok) throw new Error(data.error || '서버 오류');
     typEl.remove();
     addMsg('ai', data.answer, true);

@@ -1,3 +1,5 @@
+import { rankPages } from './lib/search.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -9,6 +11,7 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았어요.' });
 
+  // 페이지 파싱
   const pages = [];
   for (const chunk of context.split(/(?=\n?=== \[)/)) {
     const m = chunk.match(/=== \[(.+?)\] ===/);
@@ -16,87 +19,40 @@ export default async function handler(req, res) {
     pages.push({ title: m[1].trim(), content: chunk.replace(/=== \[.+?\] ===\n?/, '').trim() });
   }
 
-  function getPatchNumber(title) {
-    const m = title.match(/[Mm](\d+)/);
-    return m ? parseInt(m[1]) : 0;
-  }
+  // 검색 모듈로 관련 페이지 정밀 랭킹
+  const { relevant, exactMatches } = rankPages(question, pages);
 
-  const qLower = question.toLowerCase();
-  const qKeywords = qLower.split(/[\s,./()[\]"'?!]+/).filter(w => w.length >= 2);
-
-  const synonyms = {
-    '전투': ['전투', '스킬', '경직', '공격', '방어', '밸런스'],
-    '캐릭터': ['캐릭터', '직업', '속도', '능력치'],
-    '콘텐츠': ['콘텐츠', '던전', '필드', '레이드', '보스'],
-    '아이템': ['아이템', '장비', '소환', '소환사'],
-  };
-  let expandedKw = [...qKeywords];
-  Object.keys(synonyms).forEach(key => {
-    if (qLower.includes(key)) expandedKw = expandedKw.concat(synonyms[key]);
-  });
-  expandedKw = [...new Set(expandedKw)];
-
-  const exactTitleMatches = pages.filter(p => {
-    const tl = p.title.toLowerCase().trim();
-    return qKeywords.some(kw => tl === kw);
-  });
-
-  const scored = pages.map(p => {
-    const tl = p.title.toLowerCase();
-    const cl = p.content.toLowerCase();
-    let score = 0;
-    expandedKw.forEach(kw => {
-      if (tl === kw) score += 50;
-      else if (tl.includes(kw)) score += 8;
-      score += (cl.split(kw).length - 1);
-    });
-    const pn = getPatchNumber(p.title);
-    if (pn > 0 && score > 0) score += pn * 0.1;
-    return { ...p, score };
-  }).filter(p => p.score > 0).sort((a, b) => b.score - a.score);
-
-  let relevant = scored.slice(0, 40);
-  exactTitleMatches.forEach(em => {
-    relevant = relevant.filter(r => r.title !== em.title);
-    relevant.unshift({ ...em, score: 999 });
-  });
-
-  if (relevant.length < 3) {
-    const fallback = pages.filter(p =>
-      expandedKw.some(kw => p.title.toLowerCase().includes(kw))
-    ).slice(0, 20);
-    relevant = [...relevant, ...fallback.filter(f => !relevant.find(r => r.title === f.title))];
-  }
-  if (relevant.length === 0) relevant = pages.slice(0, 10);
-  relevant = relevant.slice(0, 45);
-
+  // exactMatches(제목 일치)는 전체 내용, 상위 12개는 전체, 나머지는 4000자 제한
   const filteredCtx = relevant.map((p, i) => {
-    const isExact = exactTitleMatches.find(em => em.title === p.title);
-    const limit = isExact ? p.content.length : (i < 10 ? p.content.length : 3000);
+    const isExact = exactMatches.find(em => em.title === p.title);
+    const limit = isExact ? p.content.length : (i < 12 ? p.content.length : 4000);
     return `=== [${p.title}] ===\n${p.content.substring(0, limit)}`;
   }).join('\n\n');
 
-  const prompt = `너는 ArcheAge WAR 게임 기획서 전문 AI야.
-아래 기획서 원문을 분석해서 질문에 정확하고 상세하게 답해.
+  const prompt = `너는 ArcheAge WAR 게임 기획서 전문 AI야. 아래 [기획서 원문]을 근거로 질문에 정확하고 상세하게 답해야 해.
 
-[절대 규칙]
-1. 질문과 직접 관련된 내용만 답해. 관련 없는 내용은 절대 포함 금지.
-2. 기획서 원문의 수치, 공식, 조건, 예외사항을 빠짐없이 포함해.
-3. 제목/서브제목 뒤 [[페이지명]] 출처 표시. 단, 같은 페이지는 처음 1번만 표시.
-4. [[페이지명]]은 반드시 ]]로 완전히 닫을 것. 불완전한 [[ 절대 금지.
-5. [[]] 안의 페이지명은 반드시 아래 목록의 실제 페이지명 그대로 사용.
-6. 기획서에 관련 내용이 있으면 반드시 찾아서 답해. "찾을 수 없습니다"는 정말 없을 때만.
-7. 한국어로, ## 대제목 [[출처]] / ### 소제목 / - 항목 / **수치** 구조.
-8. 질문 범위를 벗어나는 내용 추가 금지.
+[절대 규칙 - 반드시 준수]
+1. [기획서 원문]에 있는 내용만 사실로 인정하고, 수치/공식/조건/예외사항을 빠짐없이 정리해서 답해.
+2. 질문과 직접 관련된 내용만 포함하고, 관련 없는 내용은 절대 추가하지 마.
+3. 제목/서브제목 뒤에 [[페이지명]] 형식으로 출처를 표시해. 단, 같은 페이지는 답변 내 처음 1번만 표시하고 이후 같은 페이지를 다시 인용할 때는 [[]] 표시를 생략해.
+   예시: ## 경직 시스템 [[경직]]  /  ### 경직 시간  /  - 0.2초로 정의됨
+4. [[페이지명]]은 반드시 ]]로 완전히 닫을 것. [[처럼 닫히지 않은 형태는 절대 사용 금지.
+5. [[]] 안의 이름은 반드시 아래 [사용 가능한 페이지 목록]에 있는 실제 제목 그대로 사용해.
+6. 매우 중요: [사용 가능한 페이지 목록]에 질문 키워드와 제목이 일치하거나 유사한 페이지가 있다면, 그 페이지의 내용은 [기획서 원문]에 반드시 포함되어 있다. 어떤 경우에도 "찾을 수 없습니다"라고 답하지 말고, 원문을 끝까지 다시 살펴서 관련 문장을 찾아 답해.
+7. [기획서 원문]을 전부 검토했는데도 정말로 질문과 관련된 내용이 한 글자도 없을 때만 "기획서 원문에서 관련 내용을 찾을 수 없습니다."라고 답해.
+8. 반드시 한국어로 답하고, 구조는 ## 대제목 [[출처]] / ### 소제목 / - 항목 / **핵심 수치**로 정리해.
+9. 질문의 범위를 벗어나는 부가 설명, 다른 페이지 요약 등은 추가하지 마.
 
-[사용 가능한 페이지 목록]
+[사용 가능한 페이지 목록 - 이 목록의 페이지는 모두 아래 원문에 포함되어 있음]
 ${relevant.map(p => '- ' + p.title).join('\n')}
 
 [기획서 원문]
 ${filteredCtx}
 
 [질문]
-${question}`;
+${question}
+
+위 [기획서 원문]을 빠짐없이 검토한 뒤, 질문에 대해 가능한 가장 정확하고 상세한 답변을 작성해.`;
 
   const models = [
     'gemini-2.5-flash',
@@ -117,7 +73,7 @@ ${question}`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.0, maxOutputTokens: 4000 }
+              generationConfig: { temperature: 0.0, maxOutputTokens: 4500 }
             })
           }
         );
@@ -132,7 +88,13 @@ ${question}`;
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!raw) break;
         const cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
-        return res.json({ success: true, answer: cleaned, model, matchedPages: relevant.slice(0,10).map(p=>p.title), totalPages: pages.length });
+        return res.json({
+          success: true,
+          answer: cleaned,
+          model,
+          matchedPages: relevant.slice(0, 10).map(p => p.title),
+          totalPages: pages.length
+        });
       } catch (e) {
         if (attempt === 1) break;
         await sleep(1000);

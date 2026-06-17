@@ -351,24 +351,30 @@ document.getElementById('home-btn').addEventListener('click', function() {
 
 // ── 캐시 ──
 function saveCache(space, base, pages, loaded) {
-  var slim = loaded.map(function(p) {
-    return { id: p.id, title: p.title, depth: p.depth, hasChildren: p.hasChildren,
-             content: (p.content || '').substring(0, 3500), pageUrl: p.pageUrl || '' };
-  });
-  var data = { space: space, base: base, savedAt: Date.now(), pages: pages, loaded: slim, ctx: ctx };
+  // ctx는 저장하지 않고 항상 재계산 (대용량 ctx로 인한 localStorage 5MB 한도 초과 방지)
+  var contentLen = 6000;
+  function buildSlim(len) {
+    return loaded.map(function(p) {
+      return { id: p.id, title: p.title, depth: p.depth, hasChildren: p.hasChildren,
+               content: (p.content || '').substring(0, len), pageUrl: p.pageUrl || '' };
+    });
+  }
+  var data = { space: space, base: base, savedAt: Date.now(), pages: pages, loaded: buildSlim(contentLen) };
   var json = JSON.stringify(data);
-  if (json.length > 4 * 1024 * 1024) { data.ctx = null; json = JSON.stringify(data); }
-  if (json.length > 3 * 1024 * 1024) {
-    data.loaded = slim.map(function(p){ return {id:p.id,title:p.title,depth:p.depth,hasChildren:p.hasChildren,content:'',pageUrl:p.pageUrl||''}; });
+  // 용량 초과 시 content 길이를 단계적으로 줄여서 재시도
+  var lengths = [6000, 3000, 1500, 600, 200];
+  var li = 1;
+  while (json.length > 4.2 * 1024 * 1024 && li < lengths.length) {
+    data.loaded = buildSlim(lengths[li]);
     json = JSON.stringify(data);
+    li++;
   }
   try {
     localStorage.setItem(CACHE_KEY, json);
-    console.log('캐시 저장:', Math.round(json.length/1024) + 'KB');
+    console.log('캐시 저장:', Math.round(json.length/1024) + 'KB, content 길이:', lengths[li-1] || contentLen);
   } catch(e) {
     try {
-      data.loaded = slim.map(function(p){ return {id:p.id,title:p.title,depth:p.depth,hasChildren:p.hasChildren,content:'',pageUrl:''}; });
-      data.ctx = null;
+      data.loaded = buildSlim(0);
       localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     } catch(e2) { console.warn('캐시 저장 실패'); }
   }

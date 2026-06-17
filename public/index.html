@@ -353,7 +353,7 @@ document.getElementById('home-btn').addEventListener('click', function() {
 function saveCache(space, base, pages, loaded) {
   var slim = loaded.map(function(p) {
     return { id: p.id, title: p.title, depth: p.depth, hasChildren: p.hasChildren,
-             content: (p.content || '').substring(0, 1500), pageUrl: p.pageUrl || '' };
+             content: (p.content || '').substring(0, 3500), pageUrl: p.pageUrl || '' };
   });
   var data = { space: space, base: base, savedAt: Date.now(), pages: pages, loaded: slim, ctx: ctx };
   var json = JSON.stringify(data);
@@ -771,7 +771,12 @@ async function sendMsg() {
   abortCtrl = new AbortController();
   try {
     // 요청 크기 제한 (Vercel 4.5MB 한도 대응, 안전하게 3MB로 제한)
-    var safeCtx = ctx.length > 3000000 ? ctx.substring(0, 3000000) : ctx;
+    var safeCtx = ctx;
+    if (ctx.length > 3000000) {
+      // 페이지 경계(=== [)에서 안전하게 자르기
+      var cut = ctx.lastIndexOf('\n=== [', 3000000);
+      safeCtx = cut > 0 ? ctx.substring(0, cut) : ctx.substring(0, 3000000);
+    }
     var res = await fetch(API + '/api/ask', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       signal: abortCtrl.signal,

@@ -21,17 +21,8 @@ export default async function handler(req, res) {
     return m ? parseInt(m[1]) : 0;
   }
 
-  function cleanQuestion(q) {
-    return q
-      .replace(/(시스템|기획|내용|설명해|알려줘|줘|이|가|는|을|를|에|뭐야|뭔가요|란|이란|에 대해|에대해|관련|해줘|\?|！|!)/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
   const qLower = question.toLowerCase();
-  const qCleaned = cleanQuestion(question).toLowerCase();
   const qKeywords = qLower.split(/[\s,./()[\]"'?!]+/).filter(w => w.length >= 2);
-  const qCleanedKeywords = qCleaned.split(/\s+/).filter(w => w.length >= 2);
 
   const synonyms = {
     '전투': ['전투', '스킬', '경직', '공격', '방어', '밸런스'],
@@ -39,7 +30,7 @@ export default async function handler(req, res) {
     '콘텐츠': ['콘텐츠', '던전', '필드', '레이드', '보스'],
     '아이템': ['아이템', '장비', '소환', '소환사'],
   };
-  let expandedKw = [...qKeywords, ...qCleanedKeywords];
+  let expandedKw = [...qKeywords];
   Object.keys(synonyms).forEach(key => {
     if (qLower.includes(key)) expandedKw = expandedKw.concat(synonyms[key]);
   });
@@ -47,10 +38,7 @@ export default async function handler(req, res) {
 
   const exactTitleMatches = pages.filter(p => {
     const tl = p.title.toLowerCase().trim();
-    if (tl === qCleaned) return true;
-    if (qCleaned.includes(tl) && tl.length >= 2) return true;
-    if (qCleanedKeywords.some(kw => tl === kw)) return true;
-    return false;
+    return qKeywords.some(kw => tl === kw);
   });
 
   const scored = pages.map(p => {
@@ -59,8 +47,8 @@ export default async function handler(req, res) {
     let score = 0;
     expandedKw.forEach(kw => {
       if (tl === kw) score += 50;
-      else if (tl.includes(kw)) score += 10;
-      score += (cl.split(kw).length - 1) * 1.5;
+      else if (tl.includes(kw)) score += 8;
+      score += (cl.split(kw).length - 1);
     });
     const pn = getPatchNumber(p.title);
     if (pn > 0 && score > 0) score += pn * 0.1;
@@ -73,27 +61,20 @@ export default async function handler(req, res) {
     relevant.unshift({ ...em, score: 999 });
   });
 
-  if (relevant.length < 5) {
+  if (relevant.length < 3) {
     const fallback = pages.filter(p =>
       expandedKw.some(kw => p.title.toLowerCase().includes(kw))
-    ).slice(0, 25);
+    ).slice(0, 20);
     relevant = [...relevant, ...fallback.filter(f => !relevant.find(r => r.title === f.title))];
   }
-  if (relevant.length === 0) relevant = pages.slice(0, 15);
+  if (relevant.length === 0) relevant = pages.slice(0, 10);
   relevant = relevant.slice(0, 45);
-
-  // 제목 일치 페이지의 content가 너무 짧으면(캐시 잘림 의심) 경고 플래그
-  const shortExactMatch = exactTitleMatches.find(em => em.content.length < 200);
 
   const filteredCtx = relevant.map((p, i) => {
     const isExact = exactTitleMatches.find(em => em.title === p.title);
-    const limit = isExact ? p.content.length : (i < 12 ? p.content.length : 3000);
+    const limit = isExact ? p.content.length : (i < 10 ? p.content.length : 3000);
     return `=== [${p.title}] ===\n${p.content.substring(0, limit)}`;
   }).join('\n\n');
-
-  const warningNote = shortExactMatch
-    ? `\n\n[참고] "${shortExactMatch.title}" 페이지의 원문이 일부만 제공되었을 수 있습니다. 제공된 내용 안에서 최대한 답하고, 부족하면 그 안에서 찾은 내용만 정리해서 답하세요. "찾을 수 없습니다"라고 하기 전에 제공된 원문을 다시 확인하세요.`
-    : '';
 
   const prompt = `너는 ArcheAge WAR 게임 기획서 전문 AI야.
 아래 기획서 원문을 분석해서 질문에 정확하고 상세하게 답해.
@@ -104,12 +85,12 @@ export default async function handler(req, res) {
 3. 제목/서브제목 뒤 [[페이지명]] 출처 표시. 단, 같은 페이지는 처음 1번만 표시.
 4. [[페이지명]]은 반드시 ]]로 완전히 닫을 것. 불완전한 [[ 절대 금지.
 5. [[]] 안의 페이지명은 반드시 아래 목록의 실제 페이지명 그대로 사용.
-6. 아래 [기획서 원문]에 내용이 한 글자라도 있다면 그 내용을 최대한 활용해서 답해. 짧더라도 있는 내용을 그대로 정리해서 보여줘. 완전히 텅 비어있을 때만 "찾을 수 없습니다"라고 해.
-7. 한국어로, ## 대제목 [[출처]] / ### 소제목 / - 항목 / **수치** 구조로 답해.
-8. 질문 범위를 벗어나는 내용 추가 금지.${warningNote}
+6. 기획서에 관련 내용이 있으면 반드시 찾아서 답해. "찾을 수 없습니다"는 정말 없을 때만.
+7. 한국어로, ## 대제목 [[출처]] / ### 소제목 / - 항목 / **수치** 구조.
+8. 질문 범위를 벗어나는 내용 추가 금지.
 
 [사용 가능한 페이지 목록]
-${relevant.map(p => '- ' + p.title + ' (' + p.content.length + '자)').join('\n')}
+${relevant.map(p => '- ' + p.title).join('\n')}
 
 [기획서 원문]
 ${filteredCtx}
@@ -151,12 +132,7 @@ ${question}`;
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!raw) break;
         const cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
-        return res.json({
-          success: true,
-          answer: cleaned,
-          model,
-          debug: { matchedPages: relevant.map(p => p.title), exactMatch: exactTitleMatches.map(p => ({title: p.title, len: p.content.length})) }
-        });
+        return res.json({ success: true, answer: cleaned, model });
       } catch (e) {
         if (attempt === 1) break;
         await sleep(1000);
@@ -164,5 +140,7 @@ ${question}`;
     }
   }
 
-  return res.status(429).json({ error: 'API 요청 한도에 도달했어요. 잠시 후 다시 질문해주세요.' });
+  return res.status(429).json({
+    error: 'API 요청 한도에 도달했어요. 잠시 후 다시 질문해주세요.'
+  });
 }

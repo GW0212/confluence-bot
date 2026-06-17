@@ -5,64 +5,50 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { email, token, baseUrl, spaceKey } = req.body;
+  const { email, token, baseUrl, spaceKey, start: reqStart } = req.body;
   const auth = Buffer.from(`${email}:${token}`).toString('base64');
   const headers = { 'Authorization': `Basic ${auth}`, 'Accept': 'application/json' };
+  const limit = 100;
 
   try {
-    // 페이지 제한 없이 전체 로딩
     let allPages = [];
-    let start = 0;
-    const limit = 50;
+    let start = reqStart || 0;
+    const startTime = Date.now();
+    const MAX_TIME = 25000; // 25초 안에서만 작업 (Vercel 30초 한도 대응)
 
     while (true) {
-      const url = `${baseUrl}/wiki/rest/api/content?spaceKey=${spaceKey}&limit=${limit}&start=${start}&type=page&expand=ancestors,version`;
+      // 시간 초과 임박하면 중단하고 다음 페이지네이션 정보 반환
+      if (Date.now() - startTime > MAX_TIME) {
+        return res.json({
+          success: true,
+          pages: allPages,
+          partial: true,
+          nextStart: start,
+        });
+      }
+
+      const url = `${baseUrl}/wiki/rest/api/content?spaceKey=${spaceKey}&limit=${limit}&start=${start}&type=page&expand=ancestors`;
       const response = await fetch(url, { headers });
 
       if (response.status === 401) return res.status(401).json({ error: '인증 실패. 이메일/토큰을 확인해주세요.' });
       if (response.status === 403) return res.status(403).json({ error: '접근 권한이 없어요.' });
       if (response.status === 404) return res.status(404).json({ error: 'Space를 찾지 못했어요.' });
+      if (!response.ok) return res.status(response.status).json({ error: `Confluence API 오류 (${response.status})` });
 
       const data = await response.json();
       const results = data.results || [];
-      allPages = allPages.concat(results);
+      allPages = allPages.concat(results.map(p => ({
+        id: p.id,
+        title: p.title,
+        ancestors: p.ancestors || []
+      })));
 
-      // 다음 페이지가 없으면 종료
       if (results.length < limit) break;
       start += limit;
     }
 
-    // 트리 구조 구성
-    const pageMap = {};
-    allPages.forEach(p => {
-      pageMap[p.id] = {
-        id: p.id,
-        title: p.title,
-        parentId: p.ancestors?.length > 0 ? p.ancestors[p.ancestors.length - 1].id : null,
-        children: [],
-        depth: p.ancestors?.length || 0,
-      };
-    });
-
-    Object.values(pageMap).forEach(p => {
-      if (p.parentId && pageMap[p.parentId]) {
-        pageMap[p.parentId].children.push(p.id);
-      }
-    });
-
-    // DFS 순서로 정렬
-    const roots = Object.values(pageMap).filter(p => !p.parentId || !pageMap[p.parentId]);
-    const ordered = [];
-    function dfs(id) {
-      const p = pageMap[id];
-      if (!p) return;
-      ordered.push({ id: p.id, title: p.title, depth: p.depth, hasChildren: p.children.length > 0 });
-      p.children.forEach(childId => dfs(childId));
-    }
-    roots.forEach(r => dfs(r.id));
-
-    res.json({ success: true, pages: ordered, total: ordered.length });
+    res.json({ success: true, pages: allPages, partial: false });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message || '페이지 목록을 불러오는 중 오류가 발생했어요.' });
   }
 }

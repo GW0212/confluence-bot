@@ -438,15 +438,52 @@ async function connectConfluence() {
   // 신규 로딩
   showOv('페이지 목록 불러오는 중...', 10, 'Space: ' + space);
   try {
-    var pRes = await fetch(API + '/api/pages', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ email: email, token: token, baseUrl: base, spaceKey: space })
-    });
-    var pData = await pRes.json();
-    if (!pRes.ok) throw new Error(pData.error || '페이지 목록 조회 실패');
-    if (!pData.pages || !pData.pages.length) throw new Error('페이지를 찾지 못했어요.');
+    // 페이지 목록을 partial 응답이 끝날 때까지 반복 호출
+    var rawPages = [];
+    var nextStart = 0;
+    var loopGuard = 0;
+    while (true) {
+      loopGuard++;
+      if (loopGuard > 50) throw new Error('페이지 목록이 너무 많아요.');
+      showOv('페이지 목록 불러오는 중... (' + rawPages.length + '개 확인됨)', 10, 'Space: ' + space);
+      var pRes = await fetch(API + '/api/pages', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ email: email, token: token, baseUrl: base, spaceKey: space, start: nextStart })
+      });
+      var pText = await pRes.text();
+      var pData;
+      try { pData = JSON.parse(pText); }
+      catch(e) { throw new Error('서버 응답 오류: 페이지 목록을 불러오는 중 서버 시간 초과가 발생했어요. 잠시 후 다시 시도해주세요.'); }
+      if (!pRes.ok) throw new Error(pData.error || '페이지 목록 조회 실패');
+      rawPages = rawPages.concat(pData.pages || []);
+      if (!pData.partial) break;
+      nextStart = pData.nextStart;
+    }
+    if (!rawPages.length) throw new Error('페이지를 찾지 못했어요. Space Key를 확인해주세요.');
 
-    var pages = pData.pages;
+    // 트리 구조 구성 (클라이언트에서 처리)
+    var pageMap = {};
+    rawPages.forEach(function(p) {
+      pageMap[p.id] = {
+        id: p.id, title: p.title,
+        parentId: (p.ancestors && p.ancestors.length > 0) ? p.ancestors[p.ancestors.length-1].id : null,
+        children: [], depth: (p.ancestors ? p.ancestors.length : 0)
+      };
+    });
+    Object.keys(pageMap).forEach(function(id) {
+      var p = pageMap[id];
+      if (p.parentId && pageMap[p.parentId]) pageMap[p.parentId].children.push(id);
+    });
+    var roots = Object.keys(pageMap).filter(function(id){ var p=pageMap[id]; return !p.parentId || !pageMap[p.parentId]; });
+    var pages = [];
+    function dfs(id) {
+      var p = pageMap[id];
+      if (!p) return;
+      pages.push({ id: p.id, title: p.title, depth: p.depth, hasChildren: p.children.length > 0 });
+      p.children.forEach(dfs);
+    }
+    roots.forEach(dfs);
+
     var total = pages.length;
     var loaded = [];
 

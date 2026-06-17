@@ -396,7 +396,7 @@ textarea::placeholder{color:var(--text-dim);}
 <script>
 // ── 상수 ──
 var API = '';
-var CACHE_KEY = 'confluence_cache_v5';
+var CACHE_KEY = 'confluence_cache_v6';
 var CREDS_KEY = 'confluence_creds';
 var CACHE_TTL = 24 * 60 * 60 * 1000;
 // 서버로 보내는 요청 본문 최대 크기 (Vercel/Lambda 실질 한도 ~4.5MB 대비 안전 마진)
@@ -570,32 +570,45 @@ if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeMobileSidebar)
 
 // ── 캐시 ──
 function saveCache(space, base, pages, loaded) {
-  // ctx는 저장하지 않고 항상 재계산 (대용량 ctx로 인한 localStorage 5MB 한도 초과 방지)
-  var contentLen = 6000;
+  // localStorage 5MB 한도 안에서 절대 실패하지 않도록, 페이지 수에 따라 안전한 길이를 미리 계산
   function buildSlim(len) {
     return loaded.map(function(p) {
       return { id: p.id, title: p.title, depth: p.depth, hasChildren: p.hasChildren,
                content: (p.content || '').substring(0, len), pageUrl: p.pageUrl || '' };
     });
   }
-  var data = { space: space, base: base, savedAt: Date.now(), pages: pages, loaded: buildSlim(contentLen) };
+  // 페이지 수가 많을수록 페이지당 저장 길이를 줄여서 4MB 안에 항상 들어오도록 계산
+  var n = Math.max(loaded.length, 1);
+  var safeLen = Math.max(150, Math.min(6000, Math.floor((3.5 * 1024 * 1024) / n / 3) - 30));
+
+  var data = { space: space, base: base, savedAt: Date.now(), pages: pages, loaded: buildSlim(safeLen) };
   var json = JSON.stringify(data);
-  // 용량 초과 시 content 길이를 단계적으로 줄여서 재시도
-  var lengths = [6000, 3000, 1500, 600, 200];
+
+  // 그래도 초과하면 최후 안전장치로 더 줄이되, 절대 0까지는 가지 않음 (검색이 가능한 최소 50자 보장)
+  var lengths = [safeLen, Math.floor(safeLen/2), Math.floor(safeLen/4), 100, 50];
   var li = 1;
-  while (json.length > 4.2 * 1024 * 1024 && li < lengths.length) {
-    data.loaded = buildSlim(lengths[li]);
+  while (json.length > 4.3 * 1024 * 1024 && li < lengths.length) {
+    data.loaded = buildSlim(Math.max(50, lengths[li]));
     json = JSON.stringify(data);
     li++;
   }
+
   try {
     localStorage.setItem(CACHE_KEY, json);
-    console.log('캐시 저장:', Math.round(json.length/1024) + 'KB, content 길이:', lengths[li-1] || contentLen);
+    console.log('캐시 저장 성공:', Math.round(json.length/1024) + 'KB, 페이지당 content 길이:', Math.max(50, lengths[li-1] || safeLen));
   } catch(e) {
+    console.warn('캐시 저장 1차 실패, 최소 길이로 재시도:', e);
     try {
-      data.loaded = buildSlim(0);
+      data.loaded = buildSlim(50); // 0이 아닌 50자는 항상 보장 (검색은 가능하도록)
       localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-    } catch(e2) { console.warn('캐시 저장 실패'); }
+      console.log('캐시 저장 성공 (최소 모드, 50자)');
+    } catch(e2) {
+      console.error('캐시 저장 완전 실패. 페이지 메타데이터만 저장:', e2);
+      try {
+        data.loaded = loaded.map(function(p){ return {id:p.id,title:p.title,depth:p.depth,hasChildren:p.hasChildren,content:'',pageUrl:''}; });
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      } catch(e3) { console.error('캐시 저장 모두 실패:', e3); }
+    }
   }
 }
 
@@ -1028,6 +1041,45 @@ async function sendMsg() {
   document.getElementById('dot').className = 'dot spin';
   document.getElementById('st-text').textContent = 'AI 생각 중...';
   abortCtrl = new AbortController();
+
+  // 질문과 제목이 일치하는 페이지 중 캐시 content가 짧은 것은 실시간으로 전문을 보강
+  // (pageStore를 직접 갱신만 하고, ctx 문자열 치환 같은 위험한 작업은 하지 않음)
+  document.getElementById('st-text').textContent = '관련 페이지 확인 중...';
+  try {
+    var stopW = ['시스템','기획','내용','설명해','알려줘','줘','이','가','는','을','를','에','뭐야','뭔가요','란','이란','관련','해줘'];
+    var qC = msg;
+    stopW.forEach(function(w){ qC = qC.split(w).join(' '); });
+    qC = qC.replace(/[?!？！.,]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+
+    var boostIds = [];
+    var allIds = Object.keys(pageStore);
+    for (var bi = 0; bi < allIds.length; bi++) {
+      var bp = pageStore[allIds[bi]];
+      if (!bp) continue;
+      var btl = bp.title.toLowerCase().trim();
+      var isMatch = (btl === qC) || (qC.length > 0 && qC.indexOf(btl) >= 0 && btl.length >= 2);
+      if (isMatch && (bp.content || '').length < 2500) boostIds.push(allIds[bi]);
+      if (boostIds.length >= 5) break;
+    }
+
+    if (boostIds.length > 0 && creds.email && creds.token) {
+      await Promise.all(boostIds.map(function(bid) {
+        return fetch(API + '/api/page-content', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ email: creds.email, token: creds.token, baseUrl: creds.base, pageId: bid })
+        }).then(function(r){ return r.json(); }).then(function(d) {
+          if (d.success && d.content && d.content.length > (pageStore[bid].content||'').length) {
+            pageStore[bid].content = d.content;
+            if (d.html) pageStore[bid].html = d.html;
+          }
+        }).catch(function(e){ console.warn('보강 fetch 실패:', e); });
+      }));
+    }
+  } catch(boostErr) {
+    console.warn('페이지 보강 단계 오류(무시하고 계속):', boostErr);
+  }
+
+  document.getElementById('st-text').textContent = 'AI 생각 중...';
 
   // 질문에 맞는 관련 페이지만 골라 안전한 크기의 컨텍스트 생성 (4.5MB 한도 절대 초과 안 함)
   var built = buildSafeContext(msg);

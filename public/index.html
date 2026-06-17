@@ -301,12 +301,14 @@ textarea::placeholder{color:var(--text-dim);}
 <script>
 // ── 상수 ──
 var API = '';
-var CACHE_KEY = 'confluence_cache_v4';
+var CACHE_KEY = 'confluence_cache_v5';
 var CREDS_KEY = 'confluence_creds';
 var CACHE_TTL = 24 * 60 * 60 * 1000;
+// 서버로 보내는 요청 본문 최대 크기 (Vercel/Lambda 실질 한도 ~4.5MB 대비 안전 마진)
+var MAX_CONTEXT_BYTES = 3000000; // 3MB - question/JSON 오버헤드까지 감안한 안전선
 
 // ── 상태 ──
-var ctx = '';
+var ctx = ''; // 호환용 (더이상 직접 사용하지 않음, buildSafeContext가 매번 새로 생성)
 var busy = false;
 var abortCtrl = null;
 var pageStore = {};
@@ -314,6 +316,112 @@ var creds = {};
 var allLoadedPages = [];
 var searchIndex = [];
 var searchTimer = null;
+
+// ── UTF-8 바이트 길이 계산 (한국어 등 멀티바이트 정확히 측정) ──
+function utf8ByteLength(str) {
+  // Blob 사용이 가장 정확하고 빠름
+  return new Blob([str]).size;
+}
+
+/**
+ * 질문에 맞는 관련 페이지만 골라서, 절대 MAX_CONTEXT_BYTES를 넘지 않는
+ * 안전한 컨텍스트 문자열을 만들어 반환한다.
+ * - 1단계: 키워드 매칭으로 관련 페이지 후보를 점수순으로 정렬
+ * - 2단계: 점수 높은 페이지부터 하나씩 추가하면서 실제 UTF-8 바이트 크기를 측정
+ * - 3단계: 한도에 도달하면 그 페이지는 건너뛰고 다음(더 짧을 수 있는) 페이지 시도
+ */
+function buildSafeContext(question) {
+  var qLower = (question || '').toLowerCase();
+  var qKeywords = qLower.split(/[\s,./()[\]"'?!]+/).filter(function(w){ return w.length >= 2; });
+
+  var synonyms = {
+    '전투': ['전투','스킬','경직','공격','방어','밸런스'],
+    '캐릭터': ['캐릭터','직업','속도','능력치'],
+    '콘텐츠': ['콘텐츠','던전','필드','레이드','보스'],
+    '아이템': ['아이템','장비','소환','소환사'],
+    '경직': ['경직','스턴','블렌딩','피격'],
+  };
+  var expanded = qKeywords.slice();
+  Object.keys(synonyms).forEach(function(key) {
+    if (qLower.indexOf(key) >= 0) expanded = expanded.concat(synonyms[key]);
+  });
+  expanded = expanded.filter(function(v,i,a){ return a.indexOf(v)===i; });
+
+  // 질문 정제(조사/어미 제거) - 제목 완전일치 탐지용
+  var stop = ['시스템','기획','내용','설명해','알려줘','줘','이','가','는','을','를','에','뭐야','뭔가요','란','이란','관련','해줘'];
+  var qClean = question || '';
+  stop.forEach(function(w){ qClean = qClean.split(w).join(' '); });
+  qClean = qClean.replace(/[?!？！.,]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+
+  // 후보 페이지 점수 계산
+  var candidates = [];
+  var ids = Object.keys(pageStore);
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    var pg = pageStore[id];
+    if (!pg || !pg.content) continue;
+    var tl = pg.title.toLowerCase();
+    var cl = pg.content.substring(0, 4000).toLowerCase(); // 점수 계산은 앞부분만 (속도)
+    var score = 0;
+    var isExact = (tl.trim() === qClean) || (qClean.length>0 && qClean.indexOf(tl.trim())>=0 && tl.trim().length>=2);
+    if (isExact) score += 1000;
+    for (var k = 0; k < expanded.length; k++) {
+      var kw = expanded[k];
+      if (!kw) continue;
+      if (tl === kw) score += 50;
+      else if (tl.indexOf(kw) >= 0) score += 10;
+      var occ = cl.split(kw).length - 1;
+      if (occ > 0) score += Math.min(occ, 6);
+    }
+    if (score > 0) candidates.push({ id: id, title: pg.title, content: pg.content, score: score });
+  }
+
+  // 매칭 결과가 너무 적으면 전체 페이지 중 앞부분으로 보강 (질문이 너무 일반적인 경우 대비)
+  if (candidates.length < 5) {
+    for (var j = 0; j < ids.length && candidates.length < 20; j++) {
+      var pg2 = pageStore[ids[j]];
+      if (pg2 && pg2.content && !candidates.find(function(c){return c.id===ids[j];})) {
+        candidates.push({ id: ids[j], title: pg2.title, content: pg2.content, score: 1 });
+      }
+    }
+  }
+
+  candidates.sort(function(a,b){ return b.score - a.score; });
+
+  // 바이트 한도 안에서 최대한 많은 페이지를 담기
+  var parts = [];
+  var usedBytes = 0;
+  var perPageCap = 12000; // 페이지 1개가 통째로 한도를 다 차지하지 않도록 개별 상한
+  for (var p = 0; p < candidates.length; p++) {
+    var c = candidates[p];
+    var body = c.content.length > perPageCap ? c.content.substring(0, perPageCap) : c.content;
+    var piece = '=== [' + c.title + '] ===\n' + body + '\n\n';
+    var pieceBytes = utf8ByteLength(piece);
+    if (usedBytes + pieceBytes > MAX_CONTEXT_BYTES) {
+      // 이 페이지를 통째로 못 넣으면, 잘라서라도 일부 포함 시도 (단, 최소 500자 이상 의미있을 때만)
+      var remain = MAX_CONTEXT_BYTES - usedBytes;
+      if (remain > 800) {
+        // 바이트 기준으로 안전하게 자르기 위해 글자 단위로 줄여가며 측정
+        var approxChars = Math.floor(remain / 4) - 30; // 헤더 여유분 제외, 보수적으로 4바이트/글자 가정
+        if (approxChars > 200) {
+          var trimmedBody = body.substring(0, approxChars);
+          var trimmedPiece = '=== [' + c.title + '] ===\n' + trimmedBody + '\n\n';
+          var trimmedBytes = utf8ByteLength(trimmedPiece);
+          if (usedBytes + trimmedBytes <= MAX_CONTEXT_BYTES) {
+            parts.push(trimmedPiece);
+            usedBytes += trimmedBytes;
+          }
+        }
+      }
+      break; // 한도 도달, 더 이상 추가하지 않음
+    }
+    parts.push(piece);
+    usedBytes += pieceBytes;
+  }
+
+  var result = parts.join('');
+  return { text: result, bytes: usedBytes, pageCount: parts.length, totalCandidates: candidates.length };
+}
 
 // ── 오버레이 (class 토글 방식) ──
 function showOv(t, p, s) {
@@ -426,8 +534,6 @@ async function connectConfluence() {
       cached.loaded.forEach(function(p) {
         pageStore[p.id] = { title: p.title, content: p.content || '', html: '', pageUrl: p.pageUrl || '' };
       });
-      if (cached.ctx) { ctx = cached.ctx; }
-      else { ctx = cached.loaded.map(function(p){ return '=== [' + p.title + '] ===\n' + (p.content||''); }).join('\n\n'); }
       showOv('완료!', 100, '');
       await sleep(200);
       hideOv();
@@ -515,8 +621,6 @@ async function connectConfluence() {
     }
 
     showOv('캐시 저장 중...', 97, '다음 접속부터 즉시 로드됩니다!');
-    ctx = loaded.map(function(p){ return '=== [' + p.title + '] ===\n' + p.content.substring(0, 1500); }).join('\n\n');
-    if (ctx.length > 3500000) ctx = ctx.substring(0, 3500000); // 요청 크기 제한 대응
     saveCache(space, base, pages, loaded);
     showOv('완료!', 100, '');
     await sleep(300);
@@ -812,16 +916,26 @@ async function sendMsg() {
   document.getElementById('dot').className = 'dot spin';
   document.getElementById('st-text').textContent = 'AI 생각 중...';
   abortCtrl = new AbortController();
-  console.log('[디버그] ctx 길이:', ctx.length, '/ 페이지 수(추정):', (ctx.match(/=== \[/g)||[]).length);
+
+  // 질문에 맞는 관련 페이지만 골라 안전한 크기의 컨텍스트 생성 (4.5MB 한도 절대 초과 안 함)
+  var built = buildSafeContext(msg);
+  console.log('[디버그] 전송 페이지:', built.pageCount, '/ 후보:', built.totalCandidates, '/ 바이트:', built.bytes, '(' + (built.bytes/1024/1024).toFixed(2) + 'MB)');
+
   try {
     var res = await fetch(API + '/api/ask', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       signal: abortCtrl.signal,
-      body: JSON.stringify({ question: msg, context: ctx })
+      body: JSON.stringify({ question: msg, context: built.text })
     });
-    var data = await res.json();
+    var rawText = await res.text();
+    var data;
+    try { data = JSON.parse(rawText); }
+    catch(parseErr) {
+      console.error('[디버그] JSON 파싱 실패, 원본 응답:', rawText.substring(0, 300));
+      throw new Error('서버 응답 처리 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.');
+    }
     if (!res.ok) throw new Error(data.error || '서버 오류');
-    console.log('[디버그] 매칭된 페이지:', data.matchedPages, '/ 전체:', data.totalPages, '/ 모델:', data.model);
+    console.log('[디버그] 매칭된 페이지:', data.matchedPages, '/ 모델:', data.model);
     typEl.remove();
     addMsg('ai', data.answer, true);
   } catch(e) {
@@ -912,8 +1026,6 @@ function resizeTA(el){ el.style.height='auto'; el.style.height=Math.min(el.scrol
             cached.loaded.forEach(function(p) {
               pageStore[p.id] = { title: p.title, content: p.content||'', html: '', pageUrl: p.pageUrl||'' };
             });
-            if (cached.ctx) ctx = cached.ctx;
-            else ctx = cached.loaded.map(function(p){ return '=== ['+p.title+'] ===\n'+(p.content||''); }).join('\n\n');
             hideOv();
             showMain(cached.pages, cached.loaded, cached.savedAt);
           } catch(e) {

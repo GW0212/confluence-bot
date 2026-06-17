@@ -2,17 +2,26 @@
 <html lang="ko" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ArcheAge WAR · 기획서 AI</title>
+<link rel="icon" type="image/svg+xml" href="/favicon/icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon/icon-16.png">
+<link rel="shortcut icon" href="/favicon/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/favicon/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/favicon/icon-192.png">
+<meta name="theme-color" content="#3a6ff7">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
 :root,[data-theme="light"]{--bg:#f4f6fb;--surface:#fff;--surface2:#f0f2f8;--border:#dde1ee;--accent:#3a6ff7;--accent2:#6b44f8;--gold:#c08a1e;--text:#1a1d2e;--text-muted:#6b7394;--text-dim:#a0a8c0;--success:#1a9e5f;--error:#d93025;--shadow:0 2px 12px rgba(60,80,180,.08);}
-[data-theme="dark"]{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--border:#252a3a;--accent:#4f7cff;--accent2:#7b5cff;--gold:#d4a843;--text:#e2e6f0;--text-muted:#7a8299;--text-dim:#4a5068;--success:#3dd68c;--error:#ff5f5f;--shadow:0 2px 12px rgba(0,0,0,.3);}
+[data-theme="dark"]{--bg:#0a0c10;--surface:#171b24;--surface2:#222733;--border:#3a4258;--accent:#5b85ff;--accent2:#8b6bff;--gold:#e0b550;--text:#f0f2f7;--text-muted:#9aa3bd;--text-dim:#62697f;--success:#3dd68c;--error:#ff6b6b;--shadow:0 2px 14px rgba(0,0,0,.55);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;transition:background .25s,color .25s;}
 
 /* Header */
 header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;box-shadow:var(--shadow);}
+.hd-left{display:flex;align-items:center;}
+.mobile-menu-btn{display:none;width:34px;height:34px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:16px;color:var(--text);align-items:center;justify-content:center;}
 .hd-center{display:flex;align-items:center;justify-content:center;}
 .hd-home-btn{display:flex;align-items:center;gap:10px;background:none;border:none;cursor:pointer;padding:4px 10px;border-radius:10px;transition:background .2s;}
 .hd-home-btn:hover{background:var(--surface2);}
@@ -30,7 +39,21 @@ header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;paddin
 
 /* Overlay - 반드시 display:none으로 시작 */
 #overlay{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:9999;background:rgba(244,246,251,.95);}
-[data-theme="dark"] #overlay{background:rgba(13,15,20,.96);}
+[data-theme="dark"] #overlay{background:rgba(10,12,16,.97);}
+[data-theme="dark"] .sidebar{border-right-color:var(--border);}
+[data-theme="dark"] header{border-bottom-color:var(--border);}
+[data-theme="dark"] .sb-head,[data-theme="dark"] .sb-foot{border-color:var(--border);}
+[data-theme="dark"] .bubble{box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 4px 14px rgba(0,0,0,.4);}
+[data-theme="dark"] .modal-box{box-shadow:0 24px 64px rgba(0,0,0,.6), 0 0 0 1px var(--border);}
+[data-theme="dark"] .card{box-shadow:0 4px 20px rgba(0,0,0,.4), 0 0 0 1px var(--border);}
+[data-theme="dark"] .chip{background:var(--surface2);border-color:var(--border);}
+[data-theme="dark"] .field input,[data-theme="dark"] textarea,[data-theme="dark"] .sb-search input{background:#0d1117;border-color:var(--border);}
+[data-theme="dark"] .pi:hover{background:var(--surface2);}
+[data-theme="dark"] .pi.active{background:rgba(91,133,255,.16);}
+[data-theme="dark"] .msg.user .bubble{background:linear-gradient(135deg,rgba(91,133,255,.16),rgba(139,107,255,.1));border-color:rgba(91,133,255,.35);}
+[data-theme="dark"] .page-ref{background:rgba(91,133,255,.14);border-color:rgba(91,133,255,.4);}
+[data-theme="dark"] .status-pill{background:var(--surface2);border-color:var(--border);}
+[data-theme="dark"] .theme-btn{background:var(--surface2);border-color:var(--border);}
 #overlay.show{display:flex;}
 .spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -59,8 +82,11 @@ header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;paddin
 .layout{display:flex;height:100%;}
 
 /* Sidebar */
-.sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
-.sb-head{padding:11px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;}
+.sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:transform .25s ease;}
+.sb-head{padding:11px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;}
+.sb-close-btn{display:none;width:24px;height:24px;border:none;background:var(--surface2);border-radius:6px;cursor:pointer;font-size:12px;color:var(--text-muted);align-items:center;justify-content:center;}
+.mobile-sb-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90;}
+.mobile-sb-backdrop.show{display:block;}
 .sb-search{padding:6px 8px;flex-shrink:0;}
 .sb-search-wrap{position:relative;display:flex;align-items:center;}
 .sb-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 26px 7px 10px;font-size:12px;color:var(--text);outline:none;transition:border-color .2s;font-family:'Noto Sans KR',sans-serif;}
@@ -181,6 +207,69 @@ textarea::placeholder{color:var(--text-dim);}
 .img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:300;display:none;align-items:center;justify-content:center;cursor:zoom-out;}
 .img-viewer.open{display:flex;}
 .img-viewer img{max-width:92vw;max-height:92vh;border-radius:8px;object-fit:contain;}
+
+/* ── Mobile Responsive (≤768px) ── */
+@media (max-width: 768px) {
+  .mobile-menu-btn{display:flex;}
+  header{grid-template-columns:auto 1fr auto;padding:10px 12px;}
+  .hd-home-btn{padding:4px 6px;gap:7px;}
+  .logo{width:28px;height:28px;font-size:14px;}
+  .hd-title{font-size:13px;}
+  .hd-sub{display:none;}
+  .status-pill span{display:none;}
+  .status-pill{padding:6px;}
+
+  .layout{position:relative;}
+  .sidebar{
+    position:fixed; top:0; left:0; bottom:0; z-index:95;
+    width:78vw; max-width:300px;
+    transform:translateX(-100%);
+    box-shadow:4px 0 24px rgba(0,0,0,.25);
+  }
+  .sidebar.mobile-open{transform:translateX(0);}
+  .sb-close-btn{display:flex;}
+
+  .chat{width:100%;}
+  .msgs{padding:14px;gap:12px;}
+  .bubble{max-width:100%;font-size:13.5px;padding:11px 14px;}
+  .avatar{width:24px;height:24px;font-size:11px;}
+  .welcome{padding:24px 12px;}
+  .welcome h3{font-size:15px;}
+  .welcome p{font-size:12.5px;}
+  .chips{gap:6px;}
+  .chip{font-size:11px;padding:6px 11px;}
+
+  .input-wrap{padding:10px 12px;}
+  textarea{font-size:13.5px;padding:9px 11px;}
+  .send-btn{width:38px;height:38px;font-size:15px;}
+  .hint{display:none;}
+
+  .card{padding:22px 18px;max-width:100%;}
+  .card h2{font-size:17px;}
+  .row2{grid-template-columns:1fr;gap:10px;}
+
+  .modal-backdrop{padding:0;align-items:flex-end;}
+  .modal-box{max-width:100%;width:100%;max-height:92vh;border-radius:16px 16px 0 0;}
+  .modal-header{padding:14px 16px;}
+  .modal-title{font-size:14.5px;}
+  .modal-body{padding:16px 18px;font-size:13.5px;}
+  .modal-body h1{font-size:18px;}
+  .modal-body h2{font-size:16px;}
+  .modal-body table{font-size:12px;}
+  .modal-body th,.modal-body td{padding:6px 8px;}
+  .modal-footer{padding:10px 16px;}
+
+  .img-viewer img{max-width:96vw;max-height:88vh;}
+
+  .ov-sub{max-width:80vw;}
+  .prog-wrap{width:70vw;max-width:240px;}
+}
+
+@media (max-width: 420px) {
+  .bubble{font-size:13px;}
+  .hd-title{font-size:12px;}
+  .chip{font-size:10.5px;padding:5px 9px;}
+}
 </style>
 </head>
 <body>
@@ -195,7 +284,9 @@ textarea::placeholder{color:var(--text-dim);}
 
 <!-- Header -->
 <header>
-  <div></div>
+  <div class="hd-left">
+    <button class="mobile-menu-btn" id="mobile-menu-btn" title="페이지 목록">☰</button>
+  </div>
   <div class="hd-center">
     <button class="hd-home-btn" id="home-btn">
       <div class="logo">⚔</div>
@@ -244,9 +335,13 @@ textarea::placeholder{color:var(--text-dim);}
 
 <!-- Main -->
 <div id="main">
+  <div class="mobile-sb-backdrop" id="mobile-sb-backdrop"></div>
   <div class="layout">
-    <div class="sidebar">
-      <div class="sb-head">📄 로드된 페이지</div>
+    <div class="sidebar" id="sidebar">
+      <div class="sb-head">
+        <span>📄 로드된 페이지</span>
+        <button class="sb-close-btn" id="sb-close-btn">✕</button>
+      </div>
       <div class="sb-search">
         <div class="sb-search-wrap">
           <input type="text" id="sb-search-input" placeholder="🔍 페이지 검색...">
@@ -456,6 +551,22 @@ document.getElementById('home-btn').addEventListener('click', function() {
   addChips();
   document.getElementById('q-input').value = '';
 });
+
+// ── 모바일 사이드바 토글 ──
+function openMobileSidebar() {
+  document.getElementById('sidebar').classList.add('mobile-open');
+  document.getElementById('mobile-sb-backdrop').classList.add('show');
+}
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('mobile-sb-backdrop').classList.remove('show');
+}
+var mobileMenuBtn = document.getElementById('mobile-menu-btn');
+if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', openMobileSidebar);
+var sbCloseBtn = document.getElementById('sb-close-btn');
+if (sbCloseBtn) sbCloseBtn.addEventListener('click', closeMobileSidebar);
+var mobileBackdrop = document.getElementById('mobile-sb-backdrop');
+if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeMobileSidebar);
 
 // ── 캐시 ──
 function saveCache(space, base, pages, loaded) {
@@ -733,6 +844,7 @@ function addChips() {
 async function openModal(id) {
   var pg = pageStore[id];
   if (!pg) return;
+  if (window.innerWidth <= 768) closeMobileSidebar();
 
   document.querySelectorAll('.pi').forEach(function(x){ x.classList.remove('active'); });
   document.querySelectorAll('.pi-label').forEach(function(el){

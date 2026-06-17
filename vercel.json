@@ -2,7 +2,8 @@
   "version": 2,
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/public/index.html" }
+    { "source": "/favicon/(.*)", "destination": "/public/favicon/$1" },
+    { "source": "/((?!favicon/).*)", "destination": "/public/index.html" }
   ],
   "functions": {
     "api/ask.js": { "maxDuration": 30 },

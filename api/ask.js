@@ -132,7 +132,7 @@ ${question}`;
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!raw) break;
         const cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
-        return res.json({ success: true, answer: cleaned, model });
+        return res.json({ success: true, answer: cleaned, model, matchedPages: relevant.slice(0,10).map(p=>p.title), totalPages: pages.length });
       } catch (e) {
         if (attempt === 1) break;
         await sleep(1000);

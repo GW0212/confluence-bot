@@ -301,7 +301,7 @@ textarea::placeholder{color:var(--text-dim);}
 <script>
 // ── 상수 ──
 var API = '';
-var CACHE_KEY = 'confluence_cache_v3';
+var CACHE_KEY = 'confluence_cache_v4';
 var CREDS_KEY = 'confluence_creds';
 var CACHE_TTL = 24 * 60 * 60 * 1000;
 
@@ -769,6 +769,7 @@ async function sendMsg() {
   document.getElementById('dot').className = 'dot spin';
   document.getElementById('st-text').textContent = 'AI 생각 중...';
   abortCtrl = new AbortController();
+  console.log('[디버그] ctx 길이:', ctx.length, '/ 페이지 수(추정):', (ctx.match(/=== \[/g)||[]).length);
   try {
     var res = await fetch(API + '/api/ask', {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -777,6 +778,7 @@ async function sendMsg() {
     });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || '서버 오류');
+    console.log('[디버그] 매칭된 페이지:', data.matchedPages, '/ 전체:', data.totalPages, '/ 모델:', data.model);
     typEl.remove();
     addMsg('ai', data.answer, true);
   } catch(e) {

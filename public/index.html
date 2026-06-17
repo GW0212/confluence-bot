@@ -767,8 +767,40 @@ async function sendMsg() {
   var typEl = addTyping();
   setSendBtn(true);
   document.getElementById('dot').className = 'dot spin';
-  document.getElementById('st-text').textContent = 'AI 생각 중...';
+  document.getElementById('st-text').textContent = '관련 페이지 확인 중...';
   abortCtrl = new AbortController();
+
+  // 질문과 제목이 일치하는 페이지는 실시간으로 전문을 가져와서 ctx에 보강
+  try {
+    var qClean = msg.replace(/(시스템|기획|내용|설명해|알려줘|줘|이|가|는|을|를|에|뭐야|뭔가요|란|이란|에 대해|에대해|관련|해줘|\?|！|!)/g, ' ').replace(/\s+/g,' ').trim().toLowerCase();
+    var matchIds = [];
+    Object.keys(pageStore).forEach(function(id) {
+      var t = pageStore[id].title.toLowerCase().trim();
+      if (t === qClean || (qClean.includes(t) && t.length >= 2)) matchIds.push(id);
+    });
+    // 매칭된 페이지 중 content가 짧으면(캐시 잘림) 전문 fetch
+    for (var i = 0; i < matchIds.length; i++) {
+      var pg = pageStore[matchIds[i]];
+      if (pg && pg.content && pg.content.length < 3000 && creds.email && creds.token) {
+        try {
+          var fr = await fetch(API + '/api/page-content', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ email: creds.email, token: creds.token, baseUrl: creds.base, pageId: matchIds[i] })
+          });
+          var fd = await fr.json();
+          if (fd.success && fd.content) {
+            pg.content = fd.content;
+            pg.html = fd.html || pg.html;
+            // ctx 내 해당 페이지 내용도 갱신
+            var re = new RegExp('=== \\[' + pg.title.replace(/[.*+?^\${}()|[\]\\]/g,'\\$&') + '\\] ===\\n[^=]*?(?=\\n=== \\[|$)', 's');
+            ctx = ctx.replace(re, '=== [' + pg.title + '] ===\n' + fd.content.substring(0, 5000) + '\n\n');
+          }
+        } catch(fe) { console.warn('실시간 fetch 실패:', fe); }
+      }
+    }
+  } catch(e) { console.warn('페이지 매칭 오류:', e); }
+
+  document.getElementById('st-text').textContent = 'AI 생각 중...';
   try {
     // 요청 크기 제한 (Vercel 4.5MB 한도 대응, 안전하게 3MB로 제한)
     var safeCtx = ctx;

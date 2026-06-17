@@ -9,7 +9,6 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았어요.' });
 
-  // 페이지 파싱
   const pages = [];
   for (const chunk of context.split(/(?=\n?=== \[)/)) {
     const m = chunk.match(/=== \[(.+?)\] ===/);
@@ -22,7 +21,6 @@ export default async function handler(req, res) {
     return m ? parseInt(m[1]) : 0;
   }
 
-  // 질문에서 핵심 명사구 추출 (조사/어미 제거)
   function cleanQuestion(q) {
     return q
       .replace(/(시스템|기획|내용|설명해|알려줘|줘|이|가|는|을|를|에|뭐야|뭔가요|란|이란|에 대해|에대해|관련|해줘|\?|！|!)/g, ' ')
@@ -47,10 +45,8 @@ export default async function handler(req, res) {
   });
   expandedKw = [...new Set(expandedKw)];
 
-  // 제목 완전/부분 일치 페이지 탐지 (핵심 키워드 기준)
   const exactTitleMatches = pages.filter(p => {
     const tl = p.title.toLowerCase().trim();
-    // 정제된 질문 전체가 제목과 일치하거나, 제목이 정제된 질문에 포함되거나, 핵심 키워드가 제목과 정확히 일치
     if (tl === qCleaned) return true;
     if (qCleaned.includes(tl) && tl.length >= 2) return true;
     if (qCleanedKeywords.some(kw => tl === kw)) return true;
@@ -72,8 +68,6 @@ export default async function handler(req, res) {
   }).filter(p => p.score > 0).sort((a, b) => b.score - a.score);
 
   let relevant = scored.slice(0, 40);
-
-  // 제목 일치 페이지는 무조건 최우선 포함
   exactTitleMatches.forEach(em => {
     relevant = relevant.filter(r => r.title !== em.title);
     relevant.unshift({ ...em, score: 999 });
@@ -86,14 +80,20 @@ export default async function handler(req, res) {
     relevant = [...relevant, ...fallback.filter(f => !relevant.find(r => r.title === f.title))];
   }
   if (relevant.length === 0) relevant = pages.slice(0, 15);
-
   relevant = relevant.slice(0, 45);
+
+  // 제목 일치 페이지의 content가 너무 짧으면(캐시 잘림 의심) 경고 플래그
+  const shortExactMatch = exactTitleMatches.find(em => em.content.length < 200);
 
   const filteredCtx = relevant.map((p, i) => {
     const isExact = exactTitleMatches.find(em => em.title === p.title);
     const limit = isExact ? p.content.length : (i < 12 ? p.content.length : 3000);
     return `=== [${p.title}] ===\n${p.content.substring(0, limit)}`;
   }).join('\n\n');
+
+  const warningNote = shortExactMatch
+    ? `\n\n[참고] "${shortExactMatch.title}" 페이지의 원문이 일부만 제공되었을 수 있습니다. 제공된 내용 안에서 최대한 답하고, 부족하면 그 안에서 찾은 내용만 정리해서 답하세요. "찾을 수 없습니다"라고 하기 전에 제공된 원문을 다시 확인하세요.`
+    : '';
 
   const prompt = `너는 ArcheAge WAR 게임 기획서 전문 AI야.
 아래 기획서 원문을 분석해서 질문에 정확하고 상세하게 답해.
@@ -102,24 +102,20 @@ export default async function handler(req, res) {
 1. 질문과 직접 관련된 내용만 답해. 관련 없는 내용은 절대 포함 금지.
 2. 기획서 원문의 수치, 공식, 조건, 예외사항을 빠짐없이 포함해.
 3. 제목/서브제목 뒤 [[페이지명]] 출처 표시. 단, 같은 페이지는 처음 1번만 표시.
-   예: ## 제목 [[페이지명]]  →  ### 소제목  →  - 내용 (소제목엔 [[]] 반복 금지)
 4. [[페이지명]]은 반드시 ]]로 완전히 닫을 것. 불완전한 [[ 절대 금지.
 5. [[]] 안의 페이지명은 반드시 아래 목록의 실제 페이지명 그대로 사용.
-6. 아래 [사용 가능한 페이지 목록]에 질문 키워드와 일치하거나 유사한 제목의 페이지가 있다면, 그 페이지는 반드시 [기획서 원문]에 포함되어 있으니 내용을 찾아서 답해. "찾을 수 없습니다"라고 절대 답하지 마.
-7. 기획서 원문 전체를 다시 한번 확인한 후, 정말로 관련 내용이 전혀 없을 때만 "기획서에서 찾을 수 없습니다"라고 해.
-8. 한국어로, ## 대제목 [[출처]] / ### 소제목 / - 항목 / **수치** 구조로 답해.
-9. 질문 범위를 벗어나는 내용 추가 금지.
+6. 아래 [기획서 원문]에 내용이 한 글자라도 있다면 그 내용을 최대한 활용해서 답해. 짧더라도 있는 내용을 그대로 정리해서 보여줘. 완전히 텅 비어있을 때만 "찾을 수 없습니다"라고 해.
+7. 한국어로, ## 대제목 [[출처]] / ### 소제목 / - 항목 / **수치** 구조로 답해.
+8. 질문 범위를 벗어나는 내용 추가 금지.${warningNote}
 
-[사용 가능한 페이지 목록 - 이 중 질문과 관련된 페이지의 내용은 반드시 아래 원문에 있음]
-${relevant.map(p => '- ' + p.title).join('\n')}
+[사용 가능한 페이지 목록]
+${relevant.map(p => '- ' + p.title + ' (' + p.content.length + '자)').join('\n')}
 
 [기획서 원문]
 ${filteredCtx}
 
 [질문]
-${question}
-
-위 [기획서 원문]을 빠짐없이 검토한 후 답해. 질문과 일치하는 페이지 제목이 [사용 가능한 페이지 목록]에 있다면 그 내용은 분명히 [기획서 원문]에 존재하니 찾아서 답할 것.`;
+${question}`;
 
   const models = [
     'gemini-2.5-flash',
@@ -155,7 +151,12 @@ ${question}
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!raw) break;
         const cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
-        return res.json({ success: true, answer: cleaned, model, matchedPages: relevant.length });
+        return res.json({
+          success: true,
+          answer: cleaned,
+          model,
+          debug: { matchedPages: relevant.map(p => p.title), exactMatch: exactTitleMatches.map(p => ({title: p.title, len: p.content.length})) }
+        });
       } catch (e) {
         if (attempt === 1) break;
         await sleep(1000);
@@ -163,7 +164,5 @@ ${question}
     }
   }
 
-  return res.status(429).json({
-    error: 'API 요청 한도에 도달했어요. 잠시 후 다시 질문해주세요.'
-  });
+  return res.status(429).json({ error: 'API 요청 한도에 도달했어요. 잠시 후 다시 질문해주세요.' });
 }

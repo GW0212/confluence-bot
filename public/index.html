@@ -448,6 +448,20 @@ function buildSafeContext(question) {
   stop.forEach(function(w){ qClean = qClean.split(w).join(' '); });
   qClean = qClean.replace(/[?!？！.,]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
 
+  // ── 버전/식별자 정규화 매칭: "M57.0" ~ "M57", "Q7" ~ "Q7.1" 등 마이너 버전 차이 무시 ──
+  function extractVersionTokens(text) {
+    var out = []; var re = /[Mm](\d+)(?:\.\d+)?/g; var m;
+    while ((m = re.exec(text)) !== null) out.push('m' + m[1]);
+    return out.filter(function(v,i,a){ return a.indexOf(v)===i; });
+  }
+  function normalizeIdentifier(token) { return token.replace(/(\.\d+)+$/g, ''); }
+  function tokenizeIdentifiers(text) {
+    var m = text.match(/[A-Za-z]+\d+(?:\.\d+)*/g) || [];
+    return m.map(function(t){ return t.toLowerCase(); });
+  }
+  var qVersionTokens = extractVersionTokens(question || '');
+  var qIdentifiers = tokenizeIdentifiers(question || '').map(normalizeIdentifier);
+
   // 후보 페이지 점수 계산
   var candidates = [];
   var ids = Object.keys(pageStore);
@@ -467,6 +481,20 @@ function buildSafeContext(question) {
       else if (tl.indexOf(kw) >= 0) score += 10;
       var occ = cl.split(kw).length - 1;
       if (occ > 0) score += Math.min(occ, 6);
+    }
+    // 버전 토큰 매칭 (M57.0 질문 → M57 페이지도 강하게 매칭)
+    if (qVersionTokens.length > 0) {
+      var titleVersionTokens = extractVersionTokens(pg.title);
+      for (var vi = 0; vi < titleVersionTokens.length; vi++) {
+        if (qVersionTokens.indexOf(titleVersionTokens[vi]) >= 0) { score += 800; break; }
+      }
+    }
+    // 범용 식별자 매칭 (영문+숫자 조합의 마이너 버전 차이 무시)
+    if (qIdentifiers.length > 0) {
+      var titleIds = tokenizeIdentifiers(pg.title).map(normalizeIdentifier);
+      for (var ii = 0; ii < titleIds.length; ii++) {
+        if (qIdentifiers.indexOf(titleIds[ii]) >= 0) { score += 400; break; }
+      }
     }
     if (score > 0) candidates.push({ id: id, title: pg.title, content: pg.content, score: score });
   }
@@ -1051,6 +1079,11 @@ async function sendMsg() {
     stopW.forEach(function(w){ qC = qC.split(w).join(' '); });
     qC = qC.replace(/[?!？！.,]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
 
+    // 버전/식별자 정규화 (M57.0 → m57) - 보강 대상 탐지에도 동일 적용
+    var bqVerTokens = []; var bvRe = /[Mm](\d+)(?:\.\d+)?/g; var bvM;
+    while ((bvM = bvRe.exec(msg)) !== null) bqVerTokens.push('m' + bvM[1]);
+    bqVerTokens = bqVerTokens.filter(function(v,i,a){ return a.indexOf(v)===i; });
+
     var boostIds = [];
     var allIds = Object.keys(pageStore);
     for (var bi = 0; bi < allIds.length; bi++) {
@@ -1058,6 +1091,11 @@ async function sendMsg() {
       if (!bp) continue;
       var btl = bp.title.toLowerCase().trim();
       var isMatch = (btl === qC) || (qC.length > 0 && qC.indexOf(btl) >= 0 && btl.length >= 2);
+      if (!isMatch && bqVerTokens.length > 0) {
+        var bTitleVerTokens = []; var bvRe2 = /[Mm](\d+)(?:\.\d+)?/g; var bvM2;
+        while ((bvM2 = bvRe2.exec(bp.title)) !== null) bTitleVerTokens.push('m' + bvM2[1]);
+        if (bTitleVerTokens.some(function(t){ return bqVerTokens.indexOf(t) >= 0; })) isMatch = true;
+      }
       if (isMatch && (bp.content || '').length < 2500) boostIds.push(allIds[bi]);
       if (boostIds.length >= 5) break;
     }

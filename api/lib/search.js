@@ -49,6 +49,35 @@ export function getPatchNumber(title) {
   return m ? parseInt(m[1]) : 0;
 }
 
+/**
+ * "M57.0", "m57", "M57.2" 등에서 메이저 버전 번호만 추출 ("57")
+ * 패치/버전 표기는 마이너 버전(.0, .2 등)이 달라도 같은 메이저 패치로 취급해야
+ * "M57.0 알려줘" 질문이 "M57" 페이지를 찾을 수 있다.
+ */
+function extractVersionTokens(text) {
+  const tokens = [];
+  // M57, M57.0, M57.2 같은 패턴을 모두 찾아서 메이저 번호만 추출
+  const matches = text.matchAll(/[Mm](\d+)(?:\.\d+)?/g);
+  for (const m of matches) tokens.push('m' + m[1]);
+  return [...new Set(tokens)];
+}
+
+/**
+ * 일반화된 "느슨한 토큰 매칭": 숫자+마이너버전 표기 차이를 무시하고
+ * 같은 핵심 식별자(영문+숫자 조합)를 가지면 매칭되도록 처리.
+ * 예) "M57.0" ~ "M57", "Q7" ~ "Q7.1", "1.5.0" ~ "1.5" 등에도 일반적으로 동작.
+ */
+function normalizeIdentifier(token) {
+  // 끝에 붙은 .숫자(마이너/패치 버전)를 제거하고 핵심 식별자만 남김
+  return token.replace(/(\.\d+)+$/g, '');
+}
+
+function tokenizeIdentifiers(text) {
+  // 영문+숫자+점으로 이루어진 식별자 패턴 전체 추출 (M57.0, Q7, v1.2.3 등)
+  const matches = text.match(/[A-Za-z]+\d+(?:\.\d+)*/g) || [];
+  return matches.map(t => t.toLowerCase());
+}
+
 export function rankPages(question, pages) {
   const qLower = question.toLowerCase();
   const qCleaned = cleanQuestion(question).toLowerCase();
@@ -56,6 +85,10 @@ export function rankPages(question, pages) {
   const qCleanedTokens = qCleaned.split(/\s+/).filter(w => w.length >= 1);
 
   const expandedKw = expandKeywords(qLower, [...qKeywords, ...qCleanedTokens]);
+
+  // 버전/식별자 토큰 정규화 (M57.0 → m57)
+  const qVersionTokens = extractVersionTokens(question);
+  const qIdentifiers = tokenizeIdentifiers(question).map(normalizeIdentifier);
 
   const exactMatches = pages.filter(p => {
     const tl = p.title.toLowerCase().trim();
@@ -67,6 +100,16 @@ export function rankPages(question, pages) {
       const titleNoSpace = tl.replace(/\s+/g, '');
       const qNoSpace = qLower.replace(/\s+/g, '');
       if (qNoSpace.includes(titleNoSpace)) return true;
+    }
+    // 버전 토큰 매칭: 질문의 "m57" 토큰이 제목에 등장하는 모든 버전 표기와 정규화 후 일치하는지
+    if (qVersionTokens.length > 0) {
+      const titleVersionTokens = extractVersionTokens(p.title);
+      if (titleVersionTokens.some(t => qVersionTokens.includes(t))) return true;
+    }
+    // 일반 식별자 매칭: M57.0 ~ M57, Q7 ~ Q7.1 같은 패턴을 범용으로 처리
+    if (qIdentifiers.length > 0) {
+      const titleIdentifiers = tokenizeIdentifiers(p.title).map(normalizeIdentifier);
+      if (titleIdentifiers.some(t => qIdentifiers.includes(t))) return true;
     }
     return false;
   });
@@ -82,12 +125,21 @@ export function rankPages(question, pages) {
       const occurrences = cl.split(kw).length - 1;
       if (occurrences > 0) score += Math.min(occurrences, 8) * 1.2;
     });
+    // 버전/식별자 토큰 가중치 부여 (정규화된 매칭 시 강한 가중치)
+    if (qVersionTokens.length > 0) {
+      const titleVersionTokens = extractVersionTokens(p.title);
+      if (titleVersionTokens.some(t => qVersionTokens.includes(t))) score += 80;
+    }
+    if (qIdentifiers.length > 0) {
+      const titleIdentifiers = tokenizeIdentifiers(p.title).map(normalizeIdentifier);
+      if (titleIdentifiers.some(t => qIdentifiers.includes(t))) score += 40;
+    }
     const pn = getPatchNumber(p.title);
     if (pn > 0 && score > 0) score += pn * 0.05;
     return { ...p, score };
   }).filter(p => p.score > 0).sort((a, b) => b.score - a.score);
 
-  let relevant = scored.slice(0, 45);
+  let relevant = scored.slice(0, 50);
 
   exactMatches.forEach(em => {
     relevant = relevant.filter(r => r.title !== em.title);
@@ -104,5 +156,5 @@ export function rankPages(question, pages) {
   }
   if (relevant.length === 0) relevant = pages.slice(0, 15);
 
-  return { relevant: relevant.slice(0, 50), exactMatches, qCleaned };
+  return { relevant: relevant.slice(0, 55), exactMatches, qCleaned };
 }

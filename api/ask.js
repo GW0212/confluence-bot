@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   // exactMatches(제목 일치)는 전체 내용, 상위 12개는 전체, 나머지는 4000자 제한
   // exactMatches(버전/제목 일치)는 우선적으로 풍부한 내용을 포함하되,
   // exactMatches 수가 많을 때는 페이지당 상한을 둬서 전체 요청 크기가 과도해지지 않도록 함
-  const exactCap = exactMatches.length > 8 ? 6000 : exactMatches.length > 4 ? 9000 : 100000;
+  const exactCap = exactMatches.length > 15 ? 8000 : exactMatches.length > 8 ? 12000 : exactMatches.length > 4 ? 20000 : 100000;
   const filteredCtx = relevant.map((p, i) => {
     const isExact = exactMatches.find(em => em.title === p.title);
     const limit = isExact ? Math.min(p.content.length, exactCap) : (i < 12 ? p.content.length : 4000);

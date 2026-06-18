@@ -409,6 +409,7 @@ var abortCtrl = null;
 var pageStore = {};
 var creds = {};
 var allLoadedPages = [];
+var pageTreeMap = {}; // id → {id, title, children:[id...]} 트리 구조 (모달에서 실제 하위 페이지 표시용
 var searchIndex = [];
 var searchTimer = null;
 
@@ -815,6 +816,7 @@ function showMain(allPages, loaded, savedAt) {
     else stack[stack.length-1].children.push(node);
     stack.push(node);
   });
+  pageTreeMap = map; // 모달에서 "실제 하위 페이지" 표시에 사용
 
   var loadedIds = new Set(loaded.map(function(p){ return p.id; }));
   var list = document.getElementById('page-list');
@@ -889,8 +891,38 @@ function addChips() {
 // ── 페이지 모달 ──
 async function openModal(id) {
   var pg = pageStore[id];
-  if (!pg) return;
-  if (window.innerWidth <= 768) closeMobileSidebar();
+
+  // pageStore에 아직 없는 페이지(트리에 없거나 다른 페이지 본문 링크로만 존재하는 경우)는
+  // 새 창을 여는 대신, 바로 Confluence에서 가져와서 모달로 보여준다.
+  if (!pg) {
+    if (!creds.email || !creds.token) return; // 자격증명 없으면 시도 자체가 불가능
+    document.getElementById('modal-title').textContent = '불러오는 중...';
+    var body0 = document.getElementById('modal-body');
+    body0.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">불러오는 중...</div>';
+    document.getElementById('page-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    try {
+      var r0 = await fetch(API + '/api/page-content', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ email: creds.email, token: creds.token, baseUrl: creds.base, pageId: id })
+      });
+      var d0 = await r0.json();
+      if (d0.success) {
+        pg = { title: d0.title || '제목 없음', content: d0.content || '', html: d0.html || '', pageUrl: d0.pageUrl || '' };
+        pageStore[id] = pg; // 다음에 또 클릭하면 즉시 열리도록 캐시에 등록
+      } else {
+        body0.innerHTML = '<div style="padding:40px;text-align:center;color:var(--error)">페이지를 불러올 수 없어요.<br>' + (d0.error || '') + '</div>';
+        return;
+      }
+    } catch(e) {
+      body0.innerHTML = '<div style="padding:40px;text-align:center;color:var(--error)">페이지를 불러오는 중 오류가 발생했어요.</div>';
+      return;
+    }
+  } else {
+    if (window.innerWidth <= 768) closeMobileSidebar();
+    document.getElementById('page-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
 
   document.querySelectorAll('.pi').forEach(function(x){ x.classList.remove('active'); });
   document.querySelectorAll('.pi-label').forEach(function(el){
@@ -900,10 +932,8 @@ async function openModal(id) {
   document.getElementById('modal-title').textContent = pg.title;
   var body = document.getElementById('modal-body');
   body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">불러오는 중...</div>';
-  document.getElementById('page-modal').classList.add('open');
-  document.body.style.overflow = 'hidden';
 
-  // html 없으면 fetch
+  // html 없으면 fetch (이미 위에서 새로 가져온 경우는 pg.html이 있으므로 스킵됨)
   if (!pg.html && creds.email && creds.token) {
     try {
       var r = await fetch(API + '/api/page-content', {
@@ -920,13 +950,27 @@ async function openModal(id) {
     body.innerHTML = html;
     body.querySelectorAll('a').forEach(function(a) {
       var href = a.getAttribute('href') || '';
+      // Confluence 내부 링크는 항상 모달 안에서 열기 (새 창 절대 금지)
+      var isConfluenceLink = href.includes('/wiki/') || href.includes('/pages/') || /^\/[a-zA-Z]/.test(href) === false && href.startsWith('/');
       if (href.includes('/wiki/') || href.includes('/pages/')) {
         a.href = '#';
         a.addEventListener('click', function(e) {
           e.preventDefault();
           var pidMatch = href.match(/\/pages\/(\d+)/);
-          if (pidMatch && pageStore[pidMatch[1]]) { openModal(pidMatch[1]); }
-          else { var t = a.textContent.trim(); if (t) openModalByTitle(t); else window.open(creds.base + href, '_blank'); }
+          if (pidMatch) {
+            // pageStore에 있든 없든 openModal이 알아서 처리 (없으면 즉시 fetch)
+            openModal(pidMatch[1]);
+          } else {
+            var t = a.textContent.trim();
+            var found = t ? findPageByTitle(t) : null;
+            if (found) openModal(found.id);
+            else {
+              // 페이지 ID도 제목 매칭도 안 되면, URL에서 마지막 숫자라도 추출해 시도
+              var anyIdMatch = href.match(/(\d{4,})/);
+              if (anyIdMatch) openModal(anyIdMatch[1]);
+              else window.open(creds.base + href, '_blank'); // 정말 방법이 없을 때만 새 창
+            }
+          }
         });
       } else if (href && !href.startsWith('#')) {
         a.target = '_blank'; a.rel = 'noopener';
@@ -940,6 +984,31 @@ async function openModal(id) {
     });
   } else {
     body.innerHTML = '<p style="white-space:pre-wrap;color:var(--text-muted)">' + (pg.content || '내용 없음') + '</p>';
+  }
+
+  // 본문에 적힌 링크 목록과 별개로, 실제 Confluence 트리 구조상의 하위 페이지를 추가로 보여줌
+  // (작성자가 본문에 일부 하위 페이지만 링크로 정리해둔 경우, 누락 없이 전체 구조를 확인할 수 있도록)
+  var treeNode = pageTreeMap[id];
+  if (treeNode && treeNode.children && treeNode.children.length > 0) {
+    var sub = document.createElement('div');
+    sub.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid var(--border);';
+    var subTitle = document.createElement('div');
+    subTitle.style.cssText = 'font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;letter-spacing:.3px;';
+    subTitle.textContent = '📂 하위 페이지 전체 (' + treeNode.children.length + '개)';
+    sub.appendChild(subTitle);
+    var subList = document.createElement('div');
+    subList.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
+    treeNode.children.forEach(function(childNode) {
+      if (!childNode) return;
+      var chip = document.createElement('span');
+      chip.className = 'page-ref';
+      chip.textContent = '📄 ' + childNode.title;
+      chip.style.cursor = 'pointer';
+      chip.addEventListener('click', function(){ openModal(childNode.id); });
+      subList.appendChild(chip);
+    });
+    sub.appendChild(subList);
+    body.appendChild(sub);
   }
 
   document.getElementById('modal-ask-btn').onclick = function() {
@@ -1102,10 +1171,11 @@ async function sendMsg() {
         if (bTitleVerTokens.some(function(t){ return bqVerTokens.indexOf(t) >= 0; })) isMatch = true;
       }
       if (isMatch && (bp.content || '').length < 2500) boostIds.push(allIds[bi]);
-      if (boostIds.length >= 5) break;
+      if (boostIds.length >= 15) break; // M58처럼 관련 페이지가 많은 패치도 누락 없이 보강
     }
 
     if (boostIds.length > 0 && creds.email && creds.token) {
+      document.getElementById('st-text').textContent = '관련 페이지 ' + boostIds.length + '개 보강 중...';
       await Promise.all(boostIds.map(function(bid) {
         return fetch(API + '/api/page-content', {
           method: 'POST', headers: {'Content-Type':'application/json'},

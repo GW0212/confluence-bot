@@ -16,7 +16,16 @@ export default async function handler(req, res) {
   for (const chunk of context.split(/(?=\n?=== \[)/)) {
     const m = chunk.match(/=== \[(.+?)\] ===/);
     if (!m) continue;
-    pages.push({ title: m[1].trim(), content: chunk.replace(/=== \[.+?\] ===\n?/, '').trim() });
+    let body = chunk.replace(/=== \[.+?\] ===\n?/, '').trim();
+    // 방어적 정리: 과거 캐시에 남아있을 수 있는 CSS/HTML 속성 잔재 제거
+    // (예: "[data-colorid=...]{color:#494949}", "html[data-theme]" 같은 CSS 셀렉터 텍스트)
+    body = body
+      .replace(/\[?data-[\w-]+=[^\]\s{]*\]?\s*\{[^}]*\}/gi, '')
+      .replace(/\{color:#?[0-9a-fA-F]{3,6}\}/gi, '')
+      .replace(/\b[\w-]+\[data-[\w-]+(?:=[^\]]*)?\]/gi, '') // html[data-theme] 같은 CSS 셀렉터 텍스트
+      .replace(/&lt;|&gt;/g, '')
+      .replace(/\s{2,}/g, ' ');
+    pages.push({ title: m[1].trim(), content: body });
   }
 
   // 검색 모듈로 관련 페이지 정밀 랭킹
@@ -44,6 +53,7 @@ export default async function handler(req, res) {
 9. 반드시 한국어로 답하고, 구조는 ## 대제목 [[출처]] / ### 소제목 / - 항목 / **핵심 수치**로 정리해.
 10. 질문의 범위를 벗어나는 부가 설명, 다른 페이지 요약 등은 추가하지 마.
 11. 답변에 사용한 모든 수치, 조건, 예외사항은 [기획서 원문]에 실제로 적힌 표현을 그대로 반영해. 원문에 없는 추측이나 일반 게임 지식으로 채우지 마.
+12. [기획서 원문]에 HTML 태그, CSS 속성(예: data-colorid=..., {color:#494949}), 빈 마크업 잔재가 섞여 있다면 그건 원문 변환 과정의 부산물이니 완전히 무시하고, 실제 의미 있는 텍스트 내용만 답변에 반영해.
 
 [사용 가능한 페이지 목록 - 이 목록의 페이지는 모두 아래 원문에 포함되어 있음]
 ${relevant.map(p => '- ' + p.title).join('\n')}

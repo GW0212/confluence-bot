@@ -8,6 +8,7 @@
   "functions": {
     "api/ask.js": { "maxDuration": 30 },
     "api/pages.js": { "maxDuration": 30 },
-    "api/page-content.js": { "maxDuration": 30 }
+    "api/page-content.js": { "maxDuration": 30 },
+    "api/find-page.js": { "maxDuration": 30 }
   }
 }

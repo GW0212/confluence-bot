@@ -471,7 +471,7 @@ function buildSafeContext(question) {
     var pg = pageStore[id];
     if (!pg || !pg.content) continue;
     var tl = pg.title.toLowerCase();
-    var cl = pg.content.substring(0, 4000).toLowerCase(); // 점수 계산은 앞부분만 (속도)
+    var cl = pg.content.toLowerCase(); // 정확도 우선: 본문 전체를 검사 (일부만 보면 후반부 언급을 놓침)
     var score = 0;
     var isExact = (tl.trim() === qClean) || (qClean.length>0 && qClean.indexOf(tl.trim())>=0 && tl.trim().length>=2);
     if (isExact) score += 1000;
@@ -948,33 +948,59 @@ async function openModal(id) {
   if (pg.html) {
     var html = pg.html.replace(/src="\/wiki\//g, 'src="' + creds.base + '/wiki/');
     body.innerHTML = html;
+
+    // creds.base의 호스트명을 추출해서, "같은 Confluence 사이트로 가는 링크인지" 판별
+    var baseHost = '';
+    try { baseHost = new URL(creds.base).hostname; } catch(e) {}
+
     body.querySelectorAll('a').forEach(function(a) {
       var href = a.getAttribute('href') || '';
-      // Confluence 내부 링크는 항상 모달 안에서 열기 (새 창 절대 금지)
-      var isConfluenceLink = href.includes('/wiki/') || href.includes('/pages/') || /^\/[a-zA-Z]/.test(href) === false && href.startsWith('/');
-      if (href.includes('/wiki/') || href.includes('/pages/')) {
+      if (!href || href.startsWith('#')) return;
+
+      var hrefHost = '';
+      try { hrefHost = new URL(href, creds.base).hostname; } catch(e) {}
+
+      // Confluence 내부 페이지로 추정되는 모든 패턴을 폭넓게 인식:
+      // - /wiki/, /pages/ 가 포함된 표준 URL
+      // - /confluence/x/XXXX 같은 Tiny Link(단축 URL) 형식
+      // - baseHost(연결한 Confluence 도메인)와 같은 호스트의 링크 전부
+      // - 상대경로(/로 시작, 외부 절대 URL이 아닌 경우)
+      var looksLikeConfluence =
+        href.includes('/wiki/') || href.includes('/pages/') ||
+        /\/confluence\/x\/[A-Za-z0-9]+/.test(href) ||
+        (baseHost && hrefHost === baseHost) ||
+        (href.startsWith('/') && !href.startsWith('//'));
+
+      if (looksLikeConfluence) {
         a.href = '#';
         a.addEventListener('click', function(e) {
           e.preventDefault();
           var pidMatch = href.match(/\/pages\/(\d+)/);
+          var t = a.textContent.trim();
           if (pidMatch) {
-            // pageStore에 있든 없든 openModal이 알아서 처리 (없으면 즉시 fetch)
+            // 페이지 ID를 URL에서 바로 알 수 있는 표준 링크
             openModal(pidMatch[1]);
           } else {
-            var t = a.textContent.trim();
+            // Tiny Link 등 ID를 알 수 없는 링크는 텍스트(제목)로 먼저 매칭
             var found = t ? findPageByTitle(t) : null;
-            if (found) openModal(found.id);
-            else {
-              // 페이지 ID도 제목 매칭도 안 되면, URL에서 마지막 숫자라도 추출해 시도
+            if (found) {
+              openModal(found.id);
+            } else {
               var anyIdMatch = href.match(/(\d{4,})/);
-              if (anyIdMatch) openModal(anyIdMatch[1]);
-              else window.open(creds.base + href, '_blank'); // 정말 방법이 없을 때만 새 창
+              if (anyIdMatch) {
+                openModal(anyIdMatch[1]);
+              } else if (t) {
+                // pageStore에 없으면 Confluence에 직접 제목 검색을 요청해서 찾아옴
+                openModalBySearch(t);
+              } else {
+                alert('연결된 페이지를 찾을 수 없어요.\n좌측 사이드바 검색으로 찾아보세요.');
+              }
             }
           }
         });
       } else if (href && !href.startsWith('#')) {
+        // 진짜 외부 사이트(다른 도메인)일 때만 새 창으로 열기
         a.target = '_blank'; a.rel = 'noopener';
-        if (href.startsWith('/')) a.href = creds.base + href;
       }
     });
     body.querySelectorAll('img').forEach(function(img) {
@@ -1037,6 +1063,39 @@ function findPageByTitle(title) {
 function openModalByTitle(title) {
   var r = findPageByTitle(title);
   if (r) openModal(r.id);
+}
+
+/**
+ * pageStore에서 제목 매칭이 실패했을 때 쓰는 최종 폴백.
+ * Confluence에 CQL로 제목 검색을 요청해서, 찾으면 바로 모달로 표시하고
+ * pageStore에도 등록해서 다음부터는 즉시 열리도록 한다.
+ */
+async function openModalBySearch(title) {
+  if (!creds.email || !creds.token || !title) return false;
+  document.getElementById('modal-title').textContent = '"' + title + '" 검색 중...';
+  var body = document.getElementById('modal-body');
+  body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">기획서에서 "' + title + '"를 찾는 중...</div>';
+  document.getElementById('page-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    var r = await fetch(API + '/api/find-page', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email: creds.email, token: creds.token, baseUrl: creds.base, spaceKey: creds.space, title: title })
+    });
+    var d = await r.json();
+    if (d.success && d.id) {
+      pageStore[d.id] = { title: d.title, content: d.content || '', html: d.html || '', pageUrl: d.pageUrl || '' };
+      openModal(d.id); // 새로 등록된 페이지로 모달 다시 채움
+      return true;
+    } else {
+      body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">"' + title + '" 페이지를 찾지 못했어요.<br>좌측 사이드바 검색으로 찾아보세요.</div>';
+      return false;
+    }
+  } catch(e) {
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--error)">검색 중 오류가 발생했어요.</div>';
+    return false;
+  }
 }
 
 document.getElementById('page-modal').addEventListener('click', function(e){ if (e.target === this) closeModal(); });
@@ -1169,6 +1228,14 @@ async function sendMsg() {
         var bTitleVerTokens = []; var bvRe2 = /[Mm](\d+)(?:\.\d+)?/g; var bvM2;
         while ((bvM2 = bvRe2.exec(bp.title)) !== null) bTitleVerTokens.push('m' + bvM2[1]);
         if (bTitleVerTokens.some(function(t){ return bqVerTokens.indexOf(t) >= 0; })) isMatch = true;
+      }
+      // 제목에 없어도, 짧게 잘린 캐시 본문(앞부분)에 버전 토큰이 보이면 후보로 포함
+      // (캐시 content가 388자 정도로 짧게 저장되어 있어 본문 후반부 언급은 놓칠 수 있지만,
+      //  최소한 앞부분에 언급이 있는 페이지는 전체 내용을 받아와 정확히 확인할 수 있도록 함)
+      if (!isMatch && bqVerTokens.length > 0 && bp.content) {
+        var bContentVerTokens = []; var bvRe3 = /[Mm](\d+)(?:\.\d+)?/g; var bvM3;
+        while ((bvM3 = bvRe3.exec(bp.content)) !== null) bContentVerTokens.push('m' + bvM3[1]);
+        if (bContentVerTokens.some(function(t){ return bqVerTokens.indexOf(t) >= 0; })) isMatch = true;
       }
       if (isMatch && (bp.content || '').length < 2500) boostIds.push(allIds[bi]);
       if (boostIds.length >= 15) break; // M58처럼 관련 페이지가 많은 패치도 누락 없이 보강

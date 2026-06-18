@@ -89,7 +89,7 @@ ${question}
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.0, maxOutputTokens: 4500 }
+              generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
             })
           }
         );
@@ -103,7 +103,11 @@ ${question}
         }
         const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!raw) break;
-        const cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
+        const finishReason = data.candidates?.[0]?.finishReason;
+        let cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
+        if (finishReason === 'MAX_TOKENS') {
+          cleaned += '\n\n*(답변이 길어 일부가 잘렸어요. "계속 답변해줘"라고 다시 물어보시면 이어서 답해드릴게요.)*';
+        }
         return res.json({
           success: true,
           answer: cleaned,

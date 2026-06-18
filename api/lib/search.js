@@ -90,6 +90,8 @@ export function rankPages(question, pages) {
   const qVersionTokens = extractVersionTokens(question);
   const qIdentifiers = tokenizeIdentifiers(question).map(normalizeIdentifier);
 
+  // 버전 토큰이 하나라도 일치하면 무조건 exactMatches에 포함 (같은 패치 관련 페이지 누락 방지)
+  // 예: "M58 계획 있어?" → 제목에 M58/m58/M58.0 등이 들어간 모든 페이지를 강제 포함
   const exactMatches = pages.filter(p => {
     const tl = p.title.toLowerCase().trim();
     if (!tl) return false;
@@ -101,7 +103,7 @@ export function rankPages(question, pages) {
       const qNoSpace = qLower.replace(/\s+/g, '');
       if (qNoSpace.includes(titleNoSpace)) return true;
     }
-    // 버전 토큰 매칭: 질문의 "m57" 토큰이 제목에 등장하는 모든 버전 표기와 정규화 후 일치하는지
+    // 버전 토큰 매칭: 질문의 "m58" 토큰이 제목에 등장하면 그 페이지는 같은 패치 관련 자료이므로 무조건 포함
     if (qVersionTokens.length > 0) {
       const titleVersionTokens = extractVersionTokens(p.title);
       if (titleVersionTokens.some(t => qVersionTokens.includes(t))) return true;
@@ -139,12 +141,17 @@ export function rankPages(question, pages) {
     return { ...p, score };
   }).filter(p => p.score > 0).sort((a, b) => b.score - a.score);
 
-  let relevant = scored.slice(0, 50);
+  // exactMatches(버전/제목 일치)는 절대 잘리지 않도록 먼저 전부 확보하고,
+  // 남는 공간만큼만 점수 기반 일반 페이지를 추가한다.
+  const exactTitles = new Set(exactMatches.map(em => em.title));
+  const generalScored = scored.filter(p => !exactTitles.has(p.title));
 
-  exactMatches.forEach(em => {
-    relevant = relevant.filter(r => r.title !== em.title);
-    relevant.unshift({ ...em, score: 9999 });
-  });
+  const MAX_TOTAL = 60; // exactMatches가 많아도 전체 한도를 약간 넉넉하게
+  const remainSlots = Math.max(0, MAX_TOTAL - exactMatches.length);
+  let relevant = generalScored.slice(0, remainSlots);
+
+  // exactMatches를 맨 앞에 배치 (최고 우선순위, 절대 누락 없음)
+  relevant = [...exactMatches.map(em => ({ ...em, score: 9999 })), ...relevant];
 
   if (relevant.length < 5) {
     const fallback = pages.filter(p =>
@@ -156,5 +163,5 @@ export function rankPages(question, pages) {
   }
   if (relevant.length === 0) relevant = pages.slice(0, 15);
 
-  return { relevant: relevant.slice(0, 55), exactMatches, qCleaned };
+  return { relevant, exactMatches, qCleaned };
 }

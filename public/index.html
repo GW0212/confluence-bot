@@ -509,7 +509,12 @@ function buildSafeContext(question) {
     }
   }
 
-  candidates.sort(function(a,b){ return b.score - a.score; });
+  // 버전/식별자가 일치하는 페이지는 절대 누락되지 않도록 최우선 그룹으로 분리
+  var versionMatched = candidates.filter(function(c){ return c.score >= 400; });
+  var others = candidates.filter(function(c){ return c.score < 400; });
+  versionMatched.sort(function(a,b){ return b.score - a.score; });
+  others.sort(function(a,b){ return b.score - a.score; });
+  candidates = versionMatched.concat(others);
 
   // 바이트 한도 안에서 최대한 많은 페이지를 담기
   var parts = [];

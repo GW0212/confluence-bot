@@ -7,41 +7,72 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { question, context } = req.body;
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았어요.' });
+  // 핸들러 전체를 try/catch로 감싸서, 어떤 단계에서 예외가 나도
+  // 절대 비정형 500 에러(HTML)가 아니라 항상 JSON으로 응답하도록 보장한다.
+  try {
+    const { question, context } = req.body || {};
+    if (!question || typeof question !== 'string') {
+      return res.status(400).json({ error: '질문이 비어있어요.' });
+    }
+    if (!context || typeof context !== 'string') {
+      return res.status(400).json({ error: '기획서 내용이 비어있어요. 페이지를 새로고침해주세요.' });
+    }
 
-  // 페이지 파싱
-  const pages = [];
-  for (const chunk of context.split(/(?=\n?=== \[)/)) {
-    const m = chunk.match(/=== \[(.+?)\] ===/);
-    if (!m) continue;
-    let body = chunk.replace(/=== \[.+?\] ===\n?/, '').trim();
-    // 방어적 정리: 과거 캐시에 남아있을 수 있는 CSS/HTML 속성 잔재 제거
-    // (예: "[data-colorid=...]{color:#494949}", "html[data-theme]" 같은 CSS 셀렉터 텍스트)
-    body = body
-      .replace(/\[?data-[\w-]+=[^\]\s{]*\]?\s*\{[^}]*\}/gi, '')
-      .replace(/\{color:#?[0-9a-fA-F]{3,6}\}/gi, '')
-      .replace(/\b[\w-]+\[data-[\w-]+(?:=[^\]]*)?\]/gi, '') // html[data-theme] 같은 CSS 셀렉터 텍스트
-      .replace(/&lt;|&gt;/g, '')
-      .replace(/\s{2,}/g, ' ');
-    pages.push({ title: m[1].trim(), content: body });
-  }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았어요.' });
 
-  // 검색 모듈로 관련 페이지 정밀 랭킹
-  const { relevant, exactMatches } = rankPages(question, pages);
+    // ── 1) 페이지 파싱 (개별 청크 파싱 실패가 전체를 죽이지 않도록 try/catch) ──
+    const pages = [];
+    try {
+      for (const chunk of context.split(/(?=\n?=== \[)/)) {
+        try {
+          const m = chunk.match(/=== \[(.+?)\] ===/);
+          if (!m) continue;
+          let body = chunk.replace(/=== \[.+?\] ===\n?/, '').trim();
+          body = body
+            .replace(/\[?data-[\w-]+=[^\]\s{]*\]?\s*\{[^}]*\}/gi, '')
+            .replace(/\{color:#?[0-9a-fA-F]{3,6}\}/gi, '')
+            .replace(/\b[\w-]+\[data-[\w-]+(?:=[^\]]*)?\]/gi, '')
+            .replace(/&lt;|&gt;/g, '')
+            .replace(/\s{2,}/g, ' ');
+          pages.push({ title: m[1].trim(), content: body });
+        } catch (chunkErr) {
+          // 페이지 하나 파싱이 실패해도 나머지는 계속 처리
+          continue;
+        }
+      }
+    } catch (parseErr) {
+      return res.status(500).json({ error: '기획서 내용을 처리하는 중 오류가 발생했어요. 페이지를 새로고침 후 다시 시도해주세요.' });
+    }
 
-  // exactMatches(제목 일치)는 전체 내용, 상위 12개는 전체, 나머지는 4000자 제한
-  // exactMatches(버전/제목 일치)는 우선적으로 풍부한 내용을 포함하되,
-  // exactMatches 수가 많을 때는 페이지당 상한을 둬서 전체 요청 크기가 과도해지지 않도록 함
-  const exactCap = exactMatches.length > 15 ? 8000 : exactMatches.length > 8 ? 12000 : exactMatches.length > 4 ? 20000 : 100000;
-  const filteredCtx = relevant.map((p, i) => {
-    const isExact = exactMatches.find(em => em.title === p.title);
-    const limit = isExact ? Math.min(p.content.length, exactCap) : (i < 12 ? p.content.length : 4000);
-    return `=== [${p.title}] ===\n${p.content.substring(0, limit)}`;
-  }).join('\n\n');
+    if (pages.length === 0) {
+      return res.status(400).json({ error: '읽을 수 있는 기획서 페이지가 없어요. 페이지를 새로고침해주세요.' });
+    }
 
-  const prompt = `너는 Confluence 문서 기반 질의응답 전문 AI야. 아래 [기획서 원문]을 근거로 질문에 정확하고 상세하게 답해야 해.
+    // ── 2) 검색/랭킹 (실패해도 전체 페이지로 폴백) ──
+    let relevant = [];
+    let exactMatches = [];
+    try {
+      const result = rankPages(question, pages);
+      relevant = result.relevant || [];
+      exactMatches = result.exactMatches || [];
+    } catch (rankErr) {
+      // 검색 모듈에서 예외가 나도 답변 자체는 시도할 수 있도록 전체 페이지로 폴백
+      relevant = pages.slice(0, 30);
+      exactMatches = [];
+    }
+    if (relevant.length === 0) relevant = pages.slice(0, 15);
+
+    // ── 3) 컨텍스트 조립 ──
+    const exactCap = exactMatches.length > 15 ? 8000 : exactMatches.length > 8 ? 12000 : exactMatches.length > 4 ? 20000 : 100000;
+    const filteredCtx = relevant.map((p, i) => {
+      const isExact = exactMatches.find(em => em.title === p.title);
+      const safeContent = typeof p.content === 'string' ? p.content : '';
+      const limit = isExact ? Math.min(safeContent.length, exactCap) : (i < 12 ? safeContent.length : 4000);
+      return `=== [${p.title}] ===\n${safeContent.substring(0, limit)}`;
+    }).join('\n\n');
+
+    const prompt = `너는 Confluence 문서 기반 질의응답 전문 AI야. 아래 [기획서 원문]을 근거로 질문에 정확하고 상세하게 답해야 해.
 
 [절대 규칙 - 반드시 준수]
 1. [기획서 원문]에 있는 내용만 사실로 인정하고, 수치/공식/조건/예외사항을 빠짐없이 정리해서 답해.
@@ -70,59 +101,86 @@ ${question}
 
 위 [기획서 원문]을 빠짐없이 검토한 뒤, 질문에 대해 가능한 가장 정확하고 상세한 답변을 작성해.`;
 
-  const models = [
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash-8b',
-    'gemini-1.5-flash-latest',
-  ];
+    const models = [
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash-8b',
+      'gemini-1.5-flash-latest',
+    ];
 
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    let lastErrorDetail = '';
 
-  for (const model of models) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
-            })
-          }
-        );
-        const data = await response.json();
-        if (data.error) {
-          if (data.error.code === 429 || data.error.status === 'RESOURCE_EXHAUSTED') {
-            if (attempt === 0) { await sleep(2500); continue; }
+    for (const model of models) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
+              })
+            }
+          );
+
+          let data;
+          try {
+            data = await response.json();
+          } catch (jsonErr) {
+            lastErrorDetail = `${model}: 응답이 JSON이 아님 (status ${response.status})`;
+            if (attempt === 0) { await sleep(1000); continue; }
             break;
           }
-          throw new Error(data.error.message);
+
+          if (data.error) {
+            lastErrorDetail = `${model}: ${data.error.message || data.error.status || '알 수 없는 오류'}`;
+            if (data.error.code === 429 || data.error.status === 'RESOURCE_EXHAUSTED') {
+              if (attempt === 0) { await sleep(2500); continue; }
+              break;
+            }
+            // 모델별 오류(404 등)는 다음 모델로 즉시 넘어감
+            break;
+          }
+
+          const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!raw) {
+            lastErrorDetail = `${model}: 응답에 텍스트 없음 (finishReason: ${data.candidates?.[0]?.finishReason || 'unknown'})`;
+            break;
+          }
+
+          const finishReason = data.candidates?.[0]?.finishReason;
+          let cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
+          if (finishReason === 'MAX_TOKENS') {
+            cleaned += '\n\n*(답변이 길어 일부가 잘렸어요. "계속 답변해줘"라고 다시 물어보시면 이어서 답해드릴게요.)*';
+          }
+
+          return res.json({
+            success: true,
+            answer: cleaned,
+            model,
+            matchedPages: relevant.slice(0, 10).map(p => p.title),
+            totalPages: pages.length
+          });
+        } catch (fetchErr) {
+          lastErrorDetail = `${model}: ${fetchErr.message || '네트워크 오류'}`;
+          if (attempt === 1) break;
+          await sleep(1000);
         }
-        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!raw) break;
-        const finishReason = data.candidates?.[0]?.finishReason;
-        let cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
-        if (finishReason === 'MAX_TOKENS') {
-          cleaned += '\n\n*(답변이 길어 일부가 잘렸어요. "계속 답변해줘"라고 다시 물어보시면 이어서 답해드릴게요.)*';
-        }
-        return res.json({
-          success: true,
-          answer: cleaned,
-          model,
-          matchedPages: relevant.slice(0, 10).map(p => p.title),
-          totalPages: pages.length
-        });
-      } catch (e) {
-        if (attempt === 1) break;
-        await sleep(1000);
       }
     }
-  }
 
-  return res.status(429).json({
-    error: 'API 요청 한도에 도달했어요. 잠시 후 다시 질문해주세요.'
-  });
+    // 모든 모델/재시도가 실패한 경우에도 항상 유효한 JSON으로 응답
+    return res.status(503).json({
+      error: '일시적으로 답변을 생성하지 못했어요. 잠시 후 다시 시도해주세요.' + (lastErrorDetail ? ` (${lastErrorDetail})` : '')
+    });
+
+  } catch (fatalErr) {
+    // 위에서 예상하지 못한 어떤 예외가 나더라도 마지막 안전망으로 항상 JSON 응답
+    return res.status(500).json({
+      error: '서버 처리 중 예기치 않은 오류가 발생했어요: ' + (fatalErr.message || String(fatalErr))
+    });
+  }
 }

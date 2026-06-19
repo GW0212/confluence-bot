@@ -63,14 +63,51 @@ export default async function handler(req, res) {
     }
     if (relevant.length === 0) relevant = pages.slice(0, 15);
 
-    // ── 3) 컨텍스트 조립 ──
-    const exactCap = exactMatches.length > 15 ? 8000 : exactMatches.length > 8 ? 12000 : exactMatches.length > 4 ? 20000 : 100000;
+    // exactMatches(버전/제목 일치) 페이지는 우선적으로 풍부한 내용을 포함하되,
+    // 전체 프롬프트가 너무 커지면 Gemini 응답 생성 자체가 30초(Vercel 한도)를 넘겨
+    // FUNCTION_INVOCATION_TIMEOUT이 발생하므로, "용량(4.5MB)"이 아니라 "처리 시간"을 기준으로
+    // 훨씬 더 보수적으로 1페이지당 글자 수를 제한한다.
+    const exactCap =
+      exactMatches.length > 20 ? 1200 :
+      exactMatches.length > 12 ? 1800 :
+      exactMatches.length > 8  ? 2500 :
+      exactMatches.length > 4  ? 4000 : 6000;
+    const generalCap = 1500; // exactMatches가 아닌 일반 참고 페이지는 짧게만 포함
     const filteredCtx = relevant.map((p, i) => {
       const isExact = exactMatches.find(em => em.title === p.title);
       const safeContent = typeof p.content === 'string' ? p.content : '';
-      const limit = isExact ? Math.min(safeContent.length, exactCap) : (i < 12 ? safeContent.length : 4000);
+      const limit = isExact ? Math.min(safeContent.length, exactCap) : Math.min(safeContent.length, generalCap);
       return `=== [${p.title}] ===\n${safeContent.substring(0, limit)}`;
     }).join('\n\n');
+
+    // 전체 프롬프트가 그래도 너무 크면(약 6만자 이상) 페이지 수 자체를 줄여서 재구성
+    // (한 페이지씩 줄이는 것보다, 점수가 낮은 페이지부터 제외하는 게 응답 품질에 유리)
+    let finalRelevant = relevant;
+    let finalCtx = filteredCtx;
+    const HARD_CHAR_LIMIT = 60000;
+    if (finalCtx.length > HARD_CHAR_LIMIT) {
+      let acc = [];
+      let used = 0;
+      for (const p of relevant) {
+        const isExact = exactMatches.find(em => em.title === p.title);
+        const safeContent = typeof p.content === 'string' ? p.content : '';
+        const limit = isExact ? Math.min(safeContent.length, exactCap) : Math.min(safeContent.length, generalCap);
+        const piece = `=== [${p.title}] ===\n${safeContent.substring(0, limit)}`;
+        if (used + piece.length > HARD_CHAR_LIMIT && acc.length > 0) {
+          // exactMatches는 가능한 끝까지 우선 포함하고, 일반 페이지부터 자른다
+          if (!isExact) continue;
+        }
+        acc.push(p);
+        used += piece.length;
+      }
+      finalRelevant = acc.length > 0 ? acc : relevant.slice(0, 10);
+      finalCtx = finalRelevant.map((p, i) => {
+        const isExact = exactMatches.find(em => em.title === p.title);
+        const safeContent = typeof p.content === 'string' ? p.content : '';
+        const limit = isExact ? Math.min(safeContent.length, exactCap) : Math.min(safeContent.length, generalCap);
+        return `=== [${p.title}] ===\n${safeContent.substring(0, limit)}`;
+      }).join('\n\n');
+    }
 
     const prompt = `너는 Confluence 문서 기반 질의응답 전문 AI야. 아래 [기획서 원문]을 근거로 질문에 정확하고 상세하게 답해야 해.
 
@@ -91,10 +128,10 @@ export default async function handler(req, res) {
 13. [기획서 원문]에 HTML 태그, CSS 속성(예: data-colorid=..., {color:#494949}), 빈 마크업 잔재가 섞여 있다면 그건 원문 변환 과정의 부산물이니 완전히 무시하고, 실제 의미 있는 텍스트 내용만 답변에 반영해.
 
 [사용 가능한 페이지 목록 - 이 목록의 페이지는 모두 아래 원문에 포함되어 있음]
-${relevant.map(p => '- ' + p.title).join('\n')}
+${finalRelevant.map(p => '- ' + p.title).join('\n')}
 
 [기획서 원문]
-${filteredCtx}
+${finalCtx}
 
 [질문]
 ${question}
@@ -161,7 +198,7 @@ ${question}
             success: true,
             answer: cleaned,
             model,
-            matchedPages: relevant.slice(0, 10).map(p => p.title),
+            matchedPages: finalRelevant.slice(0, 10).map(p => p.title),
             totalPages: pages.length
           });
         } catch (fetchErr) {

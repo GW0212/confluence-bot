@@ -6,8 +6,8 @@
     { "source": "/((?!favicon/).*)", "destination": "/public/index.html" }
   ],
   "functions": {
-    "api/ask.js": { "maxDuration": 30 },
-    "api/pages.js": { "maxDuration": 30 },
+    "api/ask.js": { "maxDuration": 60 },
+    "api/pages.js": { "maxDuration": 60 },
     "api/page-content.js": { "maxDuration": 30 },
     "api/find-page.js": { "maxDuration": 30 }
   }

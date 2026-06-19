@@ -401,7 +401,7 @@ var CACHE_KEY = 'confluence_cache_v7';
 var CREDS_KEY = 'confluence_creds';
 var CACHE_TTL = 24 * 60 * 60 * 1000;
 // 서버로 보내는 요청 본문 최대 크기 (Vercel/Lambda 실질 한도 ~4.5MB 대비 안전 마진)
-var MAX_CONTEXT_BYTES = 3000000; // 3MB - question/JSON 오버헤드까지 감안한 안전선
+var MAX_CONTEXT_BYTES = 500000; // 500KB - 서버 응답 속도(Vercel 30~60초 한도) 우선, 서버에서 다시 정밀 필터링함
 
 // ── 상태 ──
 var ctx = ''; // 호환용 (더이상 직접 사용하지 않음, buildSafeContext가 매번 새로 생성)
@@ -523,7 +523,7 @@ function buildSafeContext(question) {
   // 바이트 한도 안에서 최대한 많은 페이지를 담기
   var parts = [];
   var usedBytes = 0;
-  var perPageCap = 12000; // 페이지 1개가 통째로 한도를 다 차지하지 않도록 개별 상한
+  var perPageCap = 6000; // 페이지 1개가 통째로 한도를 다 차지하지 않도록 개별 상한 (처리 속도 고려해 축소)
   for (var p = 0; p < candidates.length; p++) {
     var c = candidates[p];
     var body = c.content.length > perPageCap ? c.content.substring(0, perPageCap) : c.content;

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ArcheAge WAR · 기획서 AI</title>
+<title>Confluence 기반 질의응답 AI 시스템</title>
 <link rel="icon" type="image/svg+xml" href="/favicon/icon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon/icon-16.png">
@@ -289,10 +289,10 @@ textarea::placeholder{color:var(--text-dim);}
   </div>
   <div class="hd-center">
     <button class="hd-home-btn" id="home-btn">
-      <div class="logo">⚔</div>
+      <div class="logo">💬</div>
       <div>
-        <div class="hd-title">ArcheAge WAR · 기획서 AI</div>
-        <div class="hd-sub">Confluence 기반 질의응답 시스템</div>
+        <div class="hd-title">Confluence 기반 질의응답 AI 시스템</div>
+        <div class="hd-sub">기획서 문서를 기반으로 답변해요</div>
       </div>
     </button>
   </div>
@@ -317,7 +317,7 @@ textarea::placeholder{color:var(--text-dim);}
       </div>
       <div class="field">
         <label>Space Key</label>
-        <input id="f-space" type="text" value="ArcheageM">
+        <input id="f-space" type="text" placeholder="예: DEV, PROJ1">
       </div>
     </div>
     <div class="field">
@@ -358,8 +358,8 @@ textarea::placeholder{color:var(--text-dim);}
     <div class="chat">
       <div class="msgs" id="msgs">
         <div class="welcome" id="welcome">
-          <h3>⚔ ArcheAge WAR 기획서 AI</h3>
-          <p>기획서 내용을 전부 학습했어요.<br>게임 시스템, 콘텐츠, 수치 데이터 등 무엇이든 질문해보세요!</p>
+          <h3>💬 Confluence 기반 질의응답 AI 시스템</h3>
+          <p>기획서 내용을 전부 학습했어요.<br>문서 내용, 수치 데이터 등 무엇이든 질문해보세요!</p>
           <div class="chips" id="chips"></div>
         </div>
       </div>
@@ -580,7 +580,7 @@ document.getElementById('home-btn').addEventListener('click', function() {
   msgs.innerHTML = '';
   var welcome = document.createElement('div');
   welcome.className = 'welcome'; welcome.id = 'welcome';
-  welcome.innerHTML = '<h3>⚔ ArcheAge WAR 기획서 AI</h3><p>기획서 내용을 전부 학습했어요.<br>게임 시스템, 콘텐츠, 수치 데이터 등 무엇이든 질문해보세요!</p><div class="chips" id="chips"></div>';
+  welcome.innerHTML = '<h3>💬 Confluence 기반 질의응답 AI 시스템</h3><p>기획서 내용을 전부 학습했어요.<br>문서 내용, 수치 데이터 등 무엇이든 질문해보세요!</p><div class="chips" id="chips"></div>';
   msgs.appendChild(welcome);
   addChips();
   document.getElementById('q-input').value = '';
@@ -880,7 +880,7 @@ function addChips() {
   var chips = document.getElementById('chips');
   if (!chips) return;
   chips.innerHTML = '';
-  ['전투 시스템 기획 내용 알려줘','캐릭터 속도 시스템 설명해줘','경직 시스템이 뭐야?','스킬 StatModified 효과란?','불명예(PK) 시스템 설명해줘'].forEach(function(s) {
+  ['이 문서들의 주요 내용을 요약해줘','특정 시스템에 대해 설명해줘','관련 페이지를 모두 찾아줘'].forEach(function(s) {
     var c = document.createElement('div');
     c.className = 'chip'; c.textContent = s;
     c.addEventListener('click', function(){ document.getElementById('q-input').value = s; sendMsg(); });
@@ -1295,7 +1295,7 @@ async function sendMsg() {
 function addMsg(role, text, markdown) {
   var msgs = document.getElementById('msgs');
   var div = document.createElement('div'); div.className = 'msg ' + role;
-  var av = document.createElement('div'); av.className = 'avatar'; av.textContent = role==='ai'?'⚔':'👤';
+  var av = document.createElement('div'); av.className = 'avatar'; av.textContent = role==='ai'?'🤖':'👤';
   var bub = document.createElement('div'); bub.className = 'bubble';
   if (role==='ai'&&markdown) bub.innerHTML = mdToHtml(text);
   else bub.textContent = text;
@@ -1307,7 +1307,7 @@ function addMsg(role, text, markdown) {
 function addTyping() {
   var msgs = document.getElementById('msgs');
   var div = document.createElement('div'); div.className = 'msg ai';
-  div.innerHTML = '<div class="avatar">⚔</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  div.innerHTML = '<div class="avatar">🤖</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
   msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
   return div;
 }

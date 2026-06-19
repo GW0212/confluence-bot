@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     return `=== [${p.title}] ===\n${p.content.substring(0, limit)}`;
   }).join('\n\n');
 
-  const prompt = `너는 ArcheAge WAR 게임 기획서 전문 AI야. 아래 [기획서 원문]을 근거로 질문에 정확하고 상세하게 답해야 해.
+  const prompt = `너는 Confluence 문서 기반 질의응답 전문 AI야. 아래 [기획서 원문]을 근거로 질문에 정확하고 상세하게 답해야 해.
 
 [절대 규칙 - 반드시 준수]
 1. [기획서 원문]에 있는 내용만 사실로 인정하고, 수치/공식/조건/예외사항을 빠짐없이 정리해서 답해.

@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     try {
       for (const chunk of context.split(/(?=\n?=== \[)/)) {
         try {
-          const m = chunk.match(/=== \[(.+?)\] ===/);
+          const m = chunk.match(/=== \[(.+?)\] ===(?:\s*\(실제수정일:(\d{4}-\d{2}-\d{2})\))?/);
           if (!m) continue;
           let body = chunk.replace(/=== \[.+?\] ===\n?/, '').trim();
           body = body
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
             .replace(/\d{4}[년./]\s*\d{1,2}[월./]\s*\d{1,2}[일]?\s*\d{0,2}:?\d{0,2}에?\s+\S+\s+파일[이이]?\s+\S+에\s+의해\s+변경되었습니다\.?/g, '')
             .replace(/\S+\.(xlsx|docx|pptx|pdf|hwp|zip|csv|png|jpg)\s+파일[이이]?\s+\S+에\s+의해\s+변경되었습니다\.?/gi, '')
             .replace(/\s{2,}/g, ' ');
-          pages.push({ title: m[1].trim(), content: body });
+          pages.push({ title: m[1].trim(), content: body, lastModified: m[2] || null });
         } catch (chunkErr) {
           // 페이지 하나 파싱이 실패해도 나머지는 계속 처리
           continue;
@@ -132,10 +132,11 @@ export default async function handler(req, res) {
 14. 매우 중요 - 분량 조절: 질문이 특정 패치/버전/넓은 주제 전체를 묻는 경우(예: "M58 계획", "전투 시스템 알려줘"), 모든 세부 항목을 나열하지 말고 핵심만 압축해서 답해. 각 하위 페이지/섹션마다 2~3줄(불릿 2~3개) 이내로 핵심만 요약하고, 세세한 수치·전체 목록·모든 예외 케이스까지 다 펼치지 마. 반대로 질문이 하나의 구체적인 시스템이나 수치를 콕 집어 물으면(예: "경직 시간이 몇 초야?") 그 부분은 필요한 만큼 상세히 답해도 된다.
 15. 절대 포함 금지 - 메타 정보: 다음에 해당하는 정보는 원문에 있어도 답변에 절대 포함하지 마. ① 작성자·수정자·검토자·담당자 등 사람 이름 ② 변경일·수정일·최종 업데이트 날짜 ③ 파일명(.xlsx, .docx 등 첨부 파일) ④ "~에 의해 변경되었습니다", "~가 수정했습니다" 같은 변경 이력 문장. 오직 시스템·기능·수치·규칙 등 실제 기획 내용만 답해.
 
-[사용 가능한 페이지 목록 - 이 목록의 페이지는 모두 아래 원문에 포함되어 있음]
-${finalRelevant.map(p => '- ' + p.title).join('\n')}
+[사용 가능한 페이지 목록 - 실제 Confluence 수정일 포함]
+${finalRelevant.map(p => '- ' + p.title + (p.lastModified ? ' (수정일: ' + p.lastModified + ')' : '')).join('\n')}
 
 [기획서 원문]
+(각 페이지 헤더의 "실제수정일:" 값이 Confluence에서 가져온 실제 페이지 수정일임. 본문 내 날짜 텍스트가 아닌 이 값을 기준으로 "최근 변경/작성" 판단할 것)
 ${finalCtx}
 
 [질문]

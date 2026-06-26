@@ -27,7 +27,7 @@ export default async function handler(req, res) {
         });
       }
 
-      const url = `${baseUrl}/wiki/rest/api/content?spaceKey=${spaceKey}&limit=${limit}&start=${start}&type=page&expand=ancestors`;
+      const url = `${baseUrl}/wiki/rest/api/content?spaceKey=${spaceKey}&limit=${limit}&start=${start}&type=page&expand=ancestors,version`;
       const response = await fetch(url, { headers });
 
       if (response.status === 401) return res.status(401).json({ error: '인증 실패. 이메일/토큰을 확인해주세요.' });
@@ -40,7 +40,8 @@ export default async function handler(req, res) {
       allPages = allPages.concat(results.map(p => ({
         id: p.id,
         title: p.title,
-        ancestors: p.ancestors || []
+        ancestors: p.ancestors || [],
+        lastModified: p.version?.when || null  // ISO 8601 형식 수정일 (예: "2024-08-28T10:23:00.000Z")
       })));
 
       if (results.length < limit) break;

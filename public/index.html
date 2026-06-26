@@ -398,7 +398,7 @@ textarea::placeholder{color:var(--text-dim);}
 <script>
 // ── 상수 ──
 var API = '';
-var CACHE_KEY = 'confluence_cache_v7';
+var CACHE_KEY = 'confluence_cache_v8';
 var CREDS_KEY = 'confluence_creds';
 var CACHE_TTL = 24 * 60 * 60 * 1000;
 // 서버로 보내는 요청 본문 최대 크기 (Vercel/Lambda 실질 한도 ~4.5MB 대비 안전 마진)
@@ -528,7 +528,7 @@ function buildSafeContext(question) {
   for (var p = 0; p < candidates.length; p++) {
     var c = candidates[p];
     var body = c.content.length > perPageCap ? c.content.substring(0, perPageCap) : c.content;
-    var piece = '=== [' + c.title + '] ===\n' + body + '\n\n';
+    var piece = '=== [' + c.title + '] ===' + (c.lastModified ? ' (실제수정일:' + c.lastModified.substring(0,10) + ')' : '') + '\n' + body + '\n\n';
     var pieceBytes = utf8ByteLength(piece);
     if (usedBytes + pieceBytes > MAX_CONTEXT_BYTES) {
       // 이 페이지를 통째로 못 넣으면, 잘라서라도 일부 포함 시도 (단, 최소 500자 이상 의미있을 때만)
@@ -612,7 +612,8 @@ function saveCache(space, base, pages, loaded) {
   function buildSlim(len) {
     return loaded.map(function(p) {
       return { id: p.id, title: p.title, depth: p.depth, hasChildren: p.hasChildren,
-               content: (p.content || '').substring(0, len), pageUrl: p.pageUrl || '' };
+               content: (p.content || '').substring(0, len), pageUrl: p.pageUrl || '',
+               lastModified: p.lastModified || null };
     });
   }
   // 페이지 수가 많을수록 페이지당 저장 길이를 줄여서 4MB 안에 항상 들어오도록 계산
@@ -694,7 +695,7 @@ async function connectConfluence() {
     showOv('캐시 불러오는 중...', 90, '');
     try {
       cached.loaded.forEach(function(p) {
-        pageStore[p.id] = { title: p.title, content: p.content || '', html: '', pageUrl: p.pageUrl || '' };
+        pageStore[p.id] = { title: p.title, content: p.content || '', html: '', pageUrl: p.pageUrl || '', lastModified: p.lastModified || null };
       });
       showOv('완료!', 100, '');
       await sleep(200);
@@ -776,8 +777,8 @@ async function connectConfluence() {
       results.forEach(function(r) {
         if (r.status === 'fulfilled' && r.value.success && r.value.content && r.value.content.trim()) {
           var v = r.value;
-          pageStore[v.id] = { title: v.title, content: v.content, html: v.html || '', pageUrl: v.pageUrl || '' };
-          loaded.push({ id: v.id, title: v.title, depth: v.depth, hasChildren: v.hasChildren, content: v.content, html: v.html||'', pageUrl: v.pageUrl||'' });
+          pageStore[v.id] = { title: v.title, content: v.content, html: v.html || '', pageUrl: v.pageUrl || '', lastModified: v.lastModified || null };
+          loaded.push({ id: v.id, title: v.title, depth: v.depth, hasChildren: v.hasChildren, content: v.content, html: v.html||'', pageUrl: v.pageUrl||'', lastModified: v.lastModified||null });
         }
       });
     }
@@ -1375,7 +1376,7 @@ function resizeTA(el){ el.style.height='auto'; el.style.height=Math.min(el.scrol
         setTimeout(function() {
           try {
             cached.loaded.forEach(function(p) {
-              pageStore[p.id] = { title: p.title, content: p.content||'', html: '', pageUrl: p.pageUrl||'' };
+              pageStore[p.id] = { title: p.title, content: p.content||'', html: '', pageUrl: p.pageUrl||'', lastModified: p.lastModified||null };
             });
             hideOv();
             showMain(cached.pages, cached.loaded, cached.savedAt);

@@ -25,11 +25,13 @@ export default async function handler(req, res) {
     text = text
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<script[\s\S]*?<\/script>/gi, '')
-      // Confluence 매크로 파라미터 정의 블록 (ac:parameter 등)에 남는 CSS 유사 텍스트 제거
       .replace(/<ac:parameter[\s\S]*?<\/ac:parameter>/gi, '')
       .replace(/<ac:plain-text-body>[\s\S]*?<\/ac:plain-text-body>/gi, '')
-      // data-colorid, style="..." 같은 속성에 직접 들어간 CSS 잔재가
-      // 태그 제거 후 텍스트로 남지 않도록, 속성 자체를 태그 제거 전에 정리
+      // Confluence 변경이력(page-metadata-modification) 블록 통째로 제거
+      // — 작성자·수정자·날짜·파일명 등 메타 정보가 담긴 영역이므로 텍스트 추출 대상에서 배제
+      .replace(/<div[^>]*page-metadata-modification[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*recently-updated[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*page-metadata[^>]*>[\s\S]*?<\/div>/gi, '')
       .replace(/\s(style|data-[\w-]+)="[^"]*"/gi, '')
       .replace(/\s(style|data-[\w-]+)='[^']*'/gi, '');
 

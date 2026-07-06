@@ -1095,35 +1095,112 @@ async function openModal(id) {
       }
     });
 
-    // 3) 첨부파일 링크(다운로드) 처리 - 클릭 시 프록시를 통해 다운로드
+    // 3) 첨부파일 링크 처리
     root.querySelectorAll('a[href*="/download/attachments/"], a[href*="/wiki/download/"]').forEach(function(a) {
       var href = a.getAttribute('href') || '';
       if (href.startsWith('/')) href = creds.base + href;
       var filename = a.textContent.trim() || '파일 다운로드';
-      var ext = filename.split('.').pop().toLowerCase();
-      // 이미지 파일은 인라인 미리보기로 교체
+      var ext = filename.split('.').pop().toLowerCase().split('?')[0];
+      var proxyUrl = API + '/api/attachment?url=' + encodeURIComponent(href) +
+        '&email=' + encodeURIComponent(creds.email) +
+        '&token=' + encodeURIComponent(creds.token);
+
       if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) {
+        // 이미지: 인라인 미리보기
         var previewImg = doc.createElement('img');
-        previewImg.setAttribute('src',
-          API + '/api/attachment?url=' + encodeURIComponent(href) +
-          '&email=' + encodeURIComponent(creds.email) +
-          '&token=' + encodeURIComponent(creds.token)
-        );
-        previewImg.style.cssText = 'max-width:100%;border-radius:6px;margin:4px 0;cursor:zoom-in;';
+        previewImg.setAttribute('src', proxyUrl);
+        previewImg.style.cssText = 'max-width:100%;border-radius:6px;margin:8px 0;cursor:zoom-in;display:block;';
         previewImg.title = filename;
-        a.parentNode.replaceChild(previewImg, a);
+        previewImg.onerror = function() {
+          this.style.display = 'none';
+          var msg = doc.createElement('span');
+          msg.style.cssText = 'color:var(--text-muted);font-size:12px;';
+          msg.textContent = '🖼️ 이미지 로드 실패: ' + filename;
+          this.parentNode && this.parentNode.insertBefore(msg, this);
+        };
+        a.parentNode && a.parentNode.replaceChild(previewImg, a);
+
+      } else if (['xlsx','xls'].includes(ext)) {
+        // Excel: SheetJS로 파싱해서 표로 렌더링
+        var container = doc.createElement('div');
+        container.style.cssText = 'margin:12px 0;';
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px 0;">📊 ' + filename + ' 불러오는 중...</div>';
+        a.parentNode && a.parentNode.replaceChild(container, a);
+
+        // SheetJS가 없으면 동적으로 로드
+        function renderXlsx(arrayBuffer) {
+          try {
+            var XLSX = window.XLSX;
+            var wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+            var sheetNames = wb.SheetNames;
+            var tabsHtml = sheetNames.map(function(n, i) {
+              return '<button onclick="(function(el,i){' +
+                'el.closest(\'.xlsx-wrap\').querySelectorAll(\'.xlsx-sheet\').forEach(function(s){s.style.display=\'none\'});' +
+                'el.closest(\'.xlsx-wrap\').querySelectorAll(\'.xlsx-tab\').forEach(function(t){t.style.fontWeight=\'normal\';t.style.borderBottom=\'2px solid transparent\'});' +
+                'el.closest(\'.xlsx-wrap\').querySelector(\'.xlsx-sheet[data-idx=\\\'' + i + '\\\']\').style.display=\'block\';' +
+                'el.style.fontWeight=\'700\';el.style.borderBottom=\'2px solid var(--accent)\';})(this,' + i + ')" ' +
+                'class="xlsx-tab" style="padding:5px 12px;border:1px solid var(--border);border-bottom:' +
+                (i===0 ? '2px solid var(--accent);font-weight:700' : '2px solid transparent') +
+                ';background:var(--surface2);border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;margin-right:3px;color:var(--text);">' + escHtml(n) + '</button>';
+            }).join('');
+
+            var sheetsHtml = sheetNames.map(function(n, i) {
+              var ws = wb.Sheets[n];
+              var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+              if (!rows || rows.length === 0) return '<div data-idx="' + i + '" class="xlsx-sheet" style="display:' + (i===0?'block':'none') + ';padding:12px;color:var(--text-muted);font-size:12px;">(빈 시트)</div>';
+              var maxCols = rows.reduce(function(m, r){ return Math.max(m, r.length); }, 0);
+              var tbl = '<div data-idx="' + i + '" class="xlsx-sheet" style="display:' + (i===0?'block':'none') + ';overflow-x:auto;">' +
+                '<table style="border-collapse:collapse;width:100%;font-size:12px;min-width:400px;">';
+              rows.slice(0, 200).forEach(function(row, ri) {
+                tbl += '<tr>';
+                for (var ci = 0; ci < maxCols; ci++) {
+                  var cell = row[ci] !== undefined ? row[ci] : '';
+                  var style = 'border:1px solid var(--border);padding:4px 8px;white-space:nowrap;color:var(--text);' +
+                    (ri === 0 ? 'background:var(--surface2);font-weight:600;' : 'background:var(--surface);');
+                  tbl += '<td style="' + style + '">' + escHtml(String(cell)) + '</td>';
+                }
+                tbl += '</tr>';
+              });
+              tbl += '</table>';
+              if (rows.length > 200) tbl += '<div style="color:var(--text-muted);font-size:11px;padding:4px 0;">... 상위 200행만 표시</div>';
+              tbl += '</div>';
+              return tbl;
+            }).join('');
+
+            container.className = 'xlsx-wrap';
+            container.innerHTML =
+              '<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;">📊 ' + escHtml(filename) + '</div>' +
+              '<div>' + tabsHtml + '</div>' +
+              '<div style="border:1px solid var(--border);border-radius:0 4px 4px 4px;overflow:hidden;">' + sheetsHtml + '</div>';
+          } catch(e) {
+            container.innerHTML = '<div style="color:var(--error);font-size:12px;">📊 Excel 렌더링 실패: ' + escHtml(e.message) + '</div>';
+          }
+        }
+
+        (function(c, pu, fn) {
+          function loadAndRender() {
+            fetch(pu).then(function(r){ return r.arrayBuffer(); })
+              .then(function(buf){ renderXlsx(buf); })
+              .catch(function(e){ c.innerHTML = '<span style="color:var(--error);font-size:12px;">📊 ' + escHtml(fn) + ' 로드 실패</span>'; });
+          }
+          if (window.XLSX) {
+            loadAndRender();
+          } else {
+            var s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+            s.onload = loadAndRender;
+            s.onerror = function() { c.innerHTML = '<a href="' + pu + '" download="' + escHtml(fn) + '" style="color:var(--accent);font-size:12px;">📊 ' + escHtml(fn) + ' 다운로드</a>'; };
+            document.head.appendChild(s);
+          }
+        })(container, proxyUrl, filename);
+
       } else {
-        // 그 외 파일(xlsx, pdf 등)은 프록시 다운로드 링크로 교체
-        a.setAttribute('href',
-          API + '/api/attachment?url=' + encodeURIComponent(href) +
-          '&email=' + encodeURIComponent(creds.email) +
-          '&token=' + encodeURIComponent(creds.token)
-        );
+        // 그 외 파일: 다운로드 링크
+        var icon = ext === 'pdf' ? '📄' : ext === 'pptx' || ext === 'ppt' ? '📑' : ext === 'docx' || ext === 'doc' ? '📝' : '📎';
+        a.setAttribute('href', proxyUrl);
         a.setAttribute('download', filename);
         a.setAttribute('target', '_blank');
         a.removeAttribute('rel');
-        // 파일 아이콘 prefix 추가
-        var icon = ext === 'xlsx' || ext === 'xls' ? '📊' : ext === 'pdf' ? '📄' : ext === 'pptx' ? '📑' : '📎';
         if (!a.textContent.startsWith(icon)) a.textContent = icon + ' ' + a.textContent;
       }
     });

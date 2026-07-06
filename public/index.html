@@ -189,10 +189,10 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:10px;}
 .modal-body li{margin-bottom:4px;color:var(--text-muted);}
 .modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;table-layout:auto;}
-.modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:center;white-space:nowrap;color:var(--text);}
-.modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text-muted);text-align:center;vertical-align:middle;}
-.modal-body td:first-child{text-align:left;}
-.modal-body tr:hover td{background:rgba(58,111,247,.04);}
+.modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;white-space:nowrap;color:var(--text);vertical-align:middle;}
+.modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text);text-align:left;vertical-align:top;word-break:keep-all;line-height:1.6;}
+.modal-body tr:nth-child(even) td{background:rgba(0,0,0,.02);}
+.modal-body tr:hover td{background:rgba(58,111,247,.05);}
 .modal-body strong,.modal-body b{font-weight:600;color:var(--text);}
 .modal-body code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--gold);}
 .modal-body pre{background:var(--surface2);padding:14px;border-radius:8px;font-size:12px;overflow-x:auto;margin-bottom:12px;border:1px solid var(--border);}
@@ -1121,78 +1121,30 @@ async function openModal(id) {
         a.parentNode && a.parentNode.replaceChild(previewImg, a);
 
       } else if (['xlsx','xls'].includes(ext)) {
-        // Excel: SheetJS로 파싱해서 표로 렌더링
-        var container = doc.createElement('div');
-        container.style.cssText = 'margin:12px 0;';
-        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px 0;">📊 ' + filename + ' 불러오는 중...</div>';
-        a.parentNode && a.parentNode.replaceChild(container, a);
+        // Excel: 다운로드 버튼으로 표시
+        var dlBtn = doc.createElement('a');
+        dlBtn.setAttribute('href', proxyUrl);
+        dlBtn.setAttribute('download', filename);
+        dlBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;text-decoration:none;margin:6px 0;cursor:pointer;';
+        dlBtn.innerHTML = '📊 ' + escHtml(filename) + ' <span style="font-size:11px;color:var(--text-muted);">(클릭하여 다운로드)</span>';
+        (function(btn, pu, fn) {
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            fetch(pu)
+              .then(function(r) { return r.blob(); })
+              .then(function(blob) {
+                var url = URL.createObjectURL(blob);
+                var a2 = document.createElement('a');
+                a2.href = url; a2.download = fn;
+                document.body.appendChild(a2); a2.click();
+                document.body.removeChild(a2);
+                setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+              })
+              .catch(function() { window.open(pu, '_blank'); });
+          });
+        })(dlBtn, proxyUrl, filename);
+        a.parentNode && a.parentNode.replaceChild(dlBtn, a);
 
-        // SheetJS가 없으면 동적으로 로드
-        function renderXlsx(arrayBuffer) {
-          try {
-            var XLSX = window.XLSX;
-            var wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-            var sheetNames = wb.SheetNames;
-            var tabsHtml = sheetNames.map(function(n, i) {
-              return '<button onclick="(function(el,i){' +
-                'el.closest(\'.xlsx-wrap\').querySelectorAll(\'.xlsx-sheet\').forEach(function(s){s.style.display=\'none\'});' +
-                'el.closest(\'.xlsx-wrap\').querySelectorAll(\'.xlsx-tab\').forEach(function(t){t.style.fontWeight=\'normal\';t.style.borderBottom=\'2px solid transparent\'});' +
-                'el.closest(\'.xlsx-wrap\').querySelector(\'.xlsx-sheet[data-idx=\\\'' + i + '\\\']\').style.display=\'block\';' +
-                'el.style.fontWeight=\'700\';el.style.borderBottom=\'2px solid var(--accent)\';})(this,' + i + ')" ' +
-                'class="xlsx-tab" style="padding:5px 12px;border:1px solid var(--border);border-bottom:' +
-                (i===0 ? '2px solid var(--accent);font-weight:700' : '2px solid transparent') +
-                ';background:var(--surface2);border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;margin-right:3px;color:var(--text);">' + escHtml(n) + '</button>';
-            }).join('');
-
-            var sheetsHtml = sheetNames.map(function(n, i) {
-              var ws = wb.Sheets[n];
-              var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-              if (!rows || rows.length === 0) return '<div data-idx="' + i + '" class="xlsx-sheet" style="display:' + (i===0?'block':'none') + ';padding:12px;color:var(--text-muted);font-size:12px;">(빈 시트)</div>';
-              var maxCols = rows.reduce(function(m, r){ return Math.max(m, r.length); }, 0);
-              var tbl = '<div data-idx="' + i + '" class="xlsx-sheet" style="display:' + (i===0?'block':'none') + ';overflow-x:auto;">' +
-                '<table style="border-collapse:collapse;width:100%;font-size:12px;min-width:400px;">';
-              rows.slice(0, 200).forEach(function(row, ri) {
-                tbl += '<tr>';
-                for (var ci = 0; ci < maxCols; ci++) {
-                  var cell = row[ci] !== undefined ? row[ci] : '';
-                  var style = 'border:1px solid var(--border);padding:4px 8px;white-space:nowrap;color:var(--text);' +
-                    (ri === 0 ? 'background:var(--surface2);font-weight:600;' : 'background:var(--surface);');
-                  tbl += '<td style="' + style + '">' + escHtml(String(cell)) + '</td>';
-                }
-                tbl += '</tr>';
-              });
-              tbl += '</table>';
-              if (rows.length > 200) tbl += '<div style="color:var(--text-muted);font-size:11px;padding:4px 0;">... 상위 200행만 표시</div>';
-              tbl += '</div>';
-              return tbl;
-            }).join('');
-
-            container.className = 'xlsx-wrap';
-            container.innerHTML =
-              '<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;">📊 ' + escHtml(filename) + '</div>' +
-              '<div>' + tabsHtml + '</div>' +
-              '<div style="border:1px solid var(--border);border-radius:0 4px 4px 4px;overflow:hidden;">' + sheetsHtml + '</div>';
-          } catch(e) {
-            container.innerHTML = '<div style="color:var(--error);font-size:12px;">📊 Excel 렌더링 실패: ' + escHtml(e.message) + '</div>';
-          }
-        }
-
-        (function(c, pu, fn) {
-          function loadAndRender() {
-            fetch(pu).then(function(r){ return r.arrayBuffer(); })
-              .then(function(buf){ renderXlsx(buf); })
-              .catch(function(e){ c.innerHTML = '<span style="color:var(--error);font-size:12px;">📊 ' + escHtml(fn) + ' 로드 실패</span>'; });
-          }
-          if (window.XLSX) {
-            loadAndRender();
-          } else {
-            var s = document.createElement('script');
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-            s.onload = loadAndRender;
-            s.onerror = function() { c.innerHTML = '<a href="' + pu + '" download="' + escHtml(fn) + '" style="color:var(--accent);font-size:12px;">📊 ' + escHtml(fn) + ' 다운로드</a>'; };
-            document.head.appendChild(s);
-          }
-        })(container, proxyUrl, filename);
 
       } else {
         // 그 외 파일: 다운로드 링크
@@ -1361,7 +1313,16 @@ document.getElementById('page-modal').addEventListener('click', function(e){ if 
 document.getElementById('modal-close-btn').addEventListener('click', closeModal);
 
 // ── 이미지 뷰어 ──
-function openImgViewer(src) { document.getElementById('img-viewer-img').src = src; document.getElementById('img-viewer').classList.add('open'); }
+function openImgViewer(src) {
+  var viewerImg = document.getElementById('img-viewer-img');
+  viewerImg.src = src;
+  viewerImg.onerror = function() {
+    document.getElementById('img-viewer').classList.remove('open');
+    // 새 탭으로 열기 시도
+    window.open(src, '_blank');
+  };
+  document.getElementById('img-viewer').classList.add('open');
+}
 function closeImgViewer() { document.getElementById('img-viewer').classList.remove('open'); }
 document.getElementById('img-viewer').addEventListener('click', closeImgViewer);
 

@@ -187,9 +187,10 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-body h4,.modal-body h5{font-size:13px;font-weight:600;margin:10px 0 4px;}
 .modal-body p{margin-bottom:6px;color:var(--text);}
 .modal-body p:empty{display:none;}
-.modal-body li p{margin-bottom:2px;}
-.modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:10px;}
-.modal-body li{margin-bottom:3px;color:var(--text);}
+.modal-body li p{margin:0;padding:0;}
+.modal-body li p:empty{display:none;}
+.modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:6px;margin-top:2px;}
+.modal-body li{margin-bottom:2px;color:var(--text);}
 .modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;table-layout:auto;}
 .modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;white-space:nowrap;color:var(--text);vertical-align:middle;}
 .modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text);text-align:left;vertical-align:top;word-break:keep-all;line-height:1.6;}
@@ -1159,10 +1160,18 @@ async function openModal(id) {
       }
     });
 
-    // 빈 p 태그, <br>만 있는 p 태그 등 불필요한 공백 줄 제거
-    root.querySelectorAll('p').forEach(function(p) {
-      var inner = p.innerHTML.replace(/<br\s*\/?>/gi, '').trim();
-      if (!inner) p.remove();
+    // 빈 p/li/span 태그, <br>만 있는 태그 등 불필요한 공백 줄 제거
+    root.querySelectorAll('p, li, span').forEach(function(el) {
+      var inner = el.innerHTML.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/gi, '').trim();
+      if (!inner) el.remove();
+    });
+    // ul/ol 사이에 끼인 단독 br 제거
+    root.querySelectorAll('br').forEach(function(br) {
+      var prev = br.previousSibling;
+      var next = br.nextSibling;
+      var prevIsBlock = prev && prev.nodeType === 1 && /^(UL|OL|LI|P|DIV|H[1-6]|TABLE)$/.test(prev.tagName);
+      var nextIsBlock = next && next.nodeType === 1 && /^(UL|OL|LI|P|DIV|H[1-6]|TABLE)$/.test(next.tagName);
+      if (prevIsBlock || nextIsBlock) br.remove();
     });
 
     html = root.innerHTML;

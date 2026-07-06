@@ -1060,7 +1060,75 @@ async function openModal(id) {
   }
 
   if (pg.html) {
-    var html = pg.html.replace(/src="\/wiki\//g, 'src="' + creds.base + '/wiki/');
+    var html = pg.html;
+
+    // ── Confluence 매크로/UI 정제 ──
+    // 1) 파일 업로드 폼, 레이블 편집, 인터랙티브 매크로 UI 제거
+    var parser = new DOMParser();
+    var doc = parser.parseFromString('<div id="root">' + html + '</div>', 'text/html');
+    var root = doc.getElementById('root');
+
+    // 파일 업로드 폼 영역 제거 (끌어다 놓기, 파일 선택, 업로드 버튼 등)
+    root.querySelectorAll(
+      'form, input[type="file"], .label-editor, [class*="upload"], [class*="drag-drop"], ' +
+      '[data-testid*="upload"], .confluence-information-macro-note'
+    ).forEach(function(el){ el.remove(); });
+
+    // 변경 이력 섹션 제거
+    root.querySelectorAll(
+      '[class*="page-metadata"], [class*="recently-updated"], [class*="modification"]'
+    ).forEach(function(el){ el.remove(); });
+
+    // 2) 이미지 src를 프록시 URL로 교체 (Confluence 첨부 이미지는 인증 필요)
+    root.querySelectorAll('img').forEach(function(img) {
+      var src = img.getAttribute('src') || '';
+      if (!src) return;
+      // 절대경로로 변환
+      if (src.startsWith('/')) src = creds.base + src;
+      // Confluence 내부 이미지이면 프록시로 교체
+      if (src.includes(creds.base) || src.includes('/wiki/') || src.includes('/download/')) {
+        img.setAttribute('src',
+          API + '/api/attachment?url=' + encodeURIComponent(src) +
+          '&email=' + encodeURIComponent(creds.email) +
+          '&token=' + encodeURIComponent(creds.token)
+        );
+      }
+    });
+
+    // 3) 첨부파일 링크(다운로드) 처리 - 클릭 시 프록시를 통해 다운로드
+    root.querySelectorAll('a[href*="/download/attachments/"], a[href*="/wiki/download/"]').forEach(function(a) {
+      var href = a.getAttribute('href') || '';
+      if (href.startsWith('/')) href = creds.base + href;
+      var filename = a.textContent.trim() || '파일 다운로드';
+      var ext = filename.split('.').pop().toLowerCase();
+      // 이미지 파일은 인라인 미리보기로 교체
+      if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) {
+        var previewImg = doc.createElement('img');
+        previewImg.setAttribute('src',
+          API + '/api/attachment?url=' + encodeURIComponent(href) +
+          '&email=' + encodeURIComponent(creds.email) +
+          '&token=' + encodeURIComponent(creds.token)
+        );
+        previewImg.style.cssText = 'max-width:100%;border-radius:6px;margin:4px 0;cursor:zoom-in;';
+        previewImg.title = filename;
+        a.parentNode.replaceChild(previewImg, a);
+      } else {
+        // 그 외 파일(xlsx, pdf 등)은 프록시 다운로드 링크로 교체
+        a.setAttribute('href',
+          API + '/api/attachment?url=' + encodeURIComponent(href) +
+          '&email=' + encodeURIComponent(creds.email) +
+          '&token=' + encodeURIComponent(creds.token)
+        );
+        a.setAttribute('download', filename);
+        a.setAttribute('target', '_blank');
+        a.removeAttribute('rel');
+        // 파일 아이콘 prefix 추가
+        var icon = ext === 'xlsx' || ext === 'xls' ? '📊' : ext === 'pdf' ? '📄' : ext === 'pptx' ? '📑' : '📎';
+        if (!a.textContent.startsWith(icon)) a.textContent = icon + ' ' + a.textContent;
+      }
+    });
+
+    html = root.innerHTML;
     body.innerHTML = html;
 
     // creds.base의 호스트명을 추출해서, "같은 Confluence 사이트로 가는 링크인지" 판별

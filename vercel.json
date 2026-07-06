@@ -11,6 +11,7 @@
     "api/page-content.js": { "maxDuration": 30 },
     "api/find-page.js": { "maxDuration": 30 },
     "api/recent-pages.js": { "maxDuration": 30 },
-    "api/changed-pages.js": { "maxDuration": 30 }
+    "api/changed-pages.js": { "maxDuration": 30 },
+    "api/attachment.js": { "maxDuration": 30 }
   }
 }

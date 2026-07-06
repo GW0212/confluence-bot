@@ -215,65 +215,79 @@ textarea::placeholder{color:var(--text-dim);}
 
 /* ── Mobile Responsive (≤768px) ── */
 @media (max-width: 768px) {
+  /* 헤더 */
   .mobile-menu-btn{display:flex;}
-  header{grid-template-columns:auto 1fr auto;padding:10px 12px;}
-  .hd-home-btn{padding:4px 6px;gap:7px;}
-  .logo{width:28px;height:28px;font-size:14px;}
-  .hd-title{font-size:13px;}
+  header{grid-template-columns:auto 1fr auto;padding:10px 12px;gap:8px;}
+  .hd-home-btn{padding:4px 8px;gap:6px;}
+  .logo{width:26px;height:26px;}
+  .logo svg{width:16px;height:16px;}
+  .hd-title{font-size:12.5px;letter-spacing:-.3px;}
   .hd-sub{display:none;}
+  .status-pill{padding:5px 8px;}
   .status-pill span{display:none;}
-  .status-pill{padding:6px;}
+  .dot{width:7px;height:7px;}
 
+  /* 사이드바 */
   .layout{position:relative;}
-  .sidebar{
-    position:fixed; top:0; left:0; bottom:0; z-index:95;
-    width:78vw; max-width:300px;
-    transform:translateX(-100%);
-    box-shadow:4px 0 24px rgba(0,0,0,.25);
-  }
+  .sidebar{position:fixed;top:0;left:0;bottom:0;z-index:95;width:82vw;max-width:300px;transform:translateX(-100%);box-shadow:6px 0 32px rgba(0,0,0,.3);}
   .sidebar.mobile-open{transform:translateX(0);}
   .sb-close-btn{display:flex;}
 
+  /* 채팅 */
   .chat{width:100%;}
-  .msgs{padding:14px;gap:12px;}
-  .bubble{max-width:100%;font-size:13.5px;padding:11px 14px;}
-  .avatar{width:24px;height:24px;font-size:11px;}
-  .welcome{padding:24px 12px;}
-  .welcome h3{font-size:15px;}
-  .welcome p{font-size:12.5px;}
-  .chips{gap:6px;}
-  .chip{font-size:11px;padding:6px 11px;}
+  .msgs{padding:12px;gap:10px;}
+  .bubble{max-width:100%;font-size:13.5px;padding:10px 13px;line-height:1.65;}
+  .msg.user .bubble{border-radius:16px 4px 16px 16px;}
+  .msg.ai .bubble{border-radius:4px 16px 16px 16px;}
+  .avatar{width:26px;height:26px;}
 
-  .input-wrap{padding:10px 12px;}
-  textarea{font-size:13.5px;padding:9px 11px;}
-  .send-btn{width:38px;height:38px;font-size:15px;}
+  /* 환영 화면 */
+  .welcome{padding:20px 12px;}
+  .welcome h3{font-size:14.5px;}
+  .welcome p{font-size:12.5px;}
+  .chip-hint{font-size:11.5px;}
+
+  /* 입력창 */
+  .input-wrap{padding:8px 12px 10px;gap:8px;}
+  textarea{font-size:14px;padding:9px 12px;min-height:38px;border-radius:12px;}
+  .send-btn{width:40px;height:40px;min-width:40px;font-size:16px;border-radius:12px;}
   .hint{display:none;}
 
-  .card{padding:22px 18px;max-width:100%;}
-  .card h2{font-size:17px;}
+  /* 설정 카드 */
+  .card{padding:20px 16px;max-width:100%;border-radius:16px;}
+  .card h2{font-size:16px;}
   .row2{grid-template-columns:1fr;gap:10px;}
+  .field label{font-size:12.5px;}
+  .field input{font-size:14px;padding:9px 12px;}
 
+  /* 모달 바텀시트 */
   .modal-backdrop{padding:0;align-items:flex-end;}
-  .modal-box{max-width:100%;width:100%;max-height:92vh;border-radius:16px 16px 0 0;}
-  .modal-header{padding:14px 16px;}
-  .modal-title{font-size:14.5px;}
-  .modal-body{padding:16px 18px;font-size:13.5px;}
-  .modal-body h1{font-size:18px;}
-  .modal-body h2{font-size:16px;}
-  .modal-body table{font-size:12px;}
-  .modal-body th,.modal-body td{padding:6px 8px;}
+  .modal-box{max-width:100%;width:100%;max-height:94vh;border-radius:20px 20px 0 0;}
+  .modal-box::before{content:'';display:block;width:36px;height:4px;background:var(--border);border-radius:2px;margin:10px auto 0;}
+  .modal-header{padding:8px 16px 12px;}
+  .modal-title{font-size:14px;line-height:1.4;}
+  .modal-body{padding:14px 16px;font-size:13px;line-height:1.65;}
+  .modal-body h1{font-size:17px;}
+  .modal-body h2{font-size:15px;}
+  .modal-body h3{font-size:13.5px;}
+  .modal-body table{font-size:11.5px;display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .modal-body th,.modal-body td{padding:5px 7px;white-space:nowrap;}
   .modal-footer{padding:10px 16px;}
+  .page-ref{font-size:11px;padding:4px 8px;}
 
-  .img-viewer img{max-width:96vw;max-height:88vh;}
+  /* 이미지 뷰어 */
+  .img-viewer img{max-width:96vw;max-height:86vh;}
 
-  .ov-sub{max-width:80vw;}
-  .prog-wrap{width:70vw;max-width:240px;}
+  /* 오버레이 */
+  .ov-sub{max-width:80vw;font-size:12px;}
+  .prog-wrap{width:72vw;max-width:240px;}
 }
 
 @media (max-width: 420px) {
-  .bubble{font-size:13px;}
-  .hd-title{font-size:12px;}
-  .chip{font-size:10.5px;padding:5px 9px;}
+  .hd-title{font-size:11.5px;}
+  .bubble{font-size:13px;padding:9px 12px;}
+  .modal-body{font-size:12.5px;}
+  .modal-body table{font-size:11px;}
 }
 </style>
 </head>
@@ -1124,37 +1138,22 @@ async function openModal(id) {
         a.parentNode && a.parentNode.replaceChild(previewImg, a);
 
       } else if (['xlsx','xls'].includes(ext)) {
-        // Excel: 다운로드 버튼으로 표시
+        // Excel: 프록시 URL에 filename 파라미터 추가해서 직접 다운로드
+        var xlsxUrl = proxyUrl + '&filename=' + encodeURIComponent(filename);
         var dlBtn = doc.createElement('a');
-        dlBtn.setAttribute('href', proxyUrl);
-        dlBtn.setAttribute('download', filename);
+        dlBtn.setAttribute('href', xlsxUrl);
+        dlBtn.setAttribute('target', '_blank');
         dlBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;text-decoration:none;margin:6px 0;cursor:pointer;';
         dlBtn.innerHTML = '📊 ' + escHtml(filename) + ' <span style="font-size:11px;color:var(--text-muted);">(클릭하여 다운로드)</span>';
-        (function(btn, pu, fn) {
-          btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            fetch(pu)
-              .then(function(r) { return r.blob(); })
-              .then(function(blob) {
-                var url = URL.createObjectURL(blob);
-                var a2 = document.createElement('a');
-                a2.href = url; a2.download = fn;
-                document.body.appendChild(a2); a2.click();
-                document.body.removeChild(a2);
-                setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-              })
-              .catch(function() { window.open(pu, '_blank'); });
-          });
-        })(dlBtn, proxyUrl, filename);
         a.parentNode && a.parentNode.replaceChild(dlBtn, a);
 
 
       } else {
         // 그 외 파일: 다운로드 링크
         var icon = ext === 'pdf' ? '📄' : ext === 'pptx' || ext === 'ppt' ? '📑' : ext === 'docx' || ext === 'doc' ? '📝' : '📎';
-        a.setAttribute('href', proxyUrl);
-        a.setAttribute('download', filename);
+        a.setAttribute('href', proxyUrl + '&filename=' + encodeURIComponent(filename));
         a.setAttribute('target', '_blank');
+        a.removeAttribute('download');
         a.removeAttribute('rel');
         if (!a.textContent.startsWith(icon)) a.textContent = icon + ' ' + a.textContent;
       }

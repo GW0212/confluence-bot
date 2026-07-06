@@ -187,8 +187,8 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-body h4,.modal-body h5{font-size:13px;font-weight:600;margin:10px 0 4px;}
 .modal-body p{margin-bottom:6px;color:var(--text);}
 .modal-body p:empty{display:none;}
-.modal-body li p{margin:0;padding:0;}
-.modal-body li p:empty{display:none;}
+.modal-body li p,.modal-body li span,.modal-body li div{margin:0;padding:0;display:inline;}
+.modal-body li p:empty,.modal-body li span:empty{display:none;}
 .modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:6px;margin-top:2px;}
 .modal-body li{margin-bottom:2px;color:var(--text);}
 .modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;table-layout:auto;}
@@ -1159,18 +1159,42 @@ async function openModal(id) {
       }
     });
 
-    // 빈 p/li/span 태그, <br>만 있는 태그 등 불필요한 공백 줄 제거
+    // ── HTML 정제: Confluence 특유의 불필요한 여백/태그 제거 ──
+
+    // 1) li 안에 p만 있으면 p를 언래핑 (li > p > 내용 → li > 내용)
+    //    이게 li 아이템 사이에 margin이 생기는 핵심 원인
+    root.querySelectorAll('li > p:only-child').forEach(function(p) {
+      while (p.firstChild) p.parentNode.insertBefore(p.firstChild, p);
+      p.remove();
+    });
+
+    // 2) 빈 p/li/span (br, &nbsp;만 있는 것 포함) 통째로 제거
     root.querySelectorAll('p, li, span').forEach(function(el) {
-      var inner = el.innerHTML.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/gi, '').trim();
+      var inner = el.innerHTML
+        .replace(/<br\s*\/?>/gi, '')
+        .replace(/&nbsp;/gi, '')
+        .replace(/\s/g, '')
+        .trim();
       if (!inner) el.remove();
     });
-    // ul/ol 사이에 끼인 단독 br 제거
+
+    // 3) 블록 요소 앞뒤 단독 br 제거
     root.querySelectorAll('br').forEach(function(br) {
       var prev = br.previousSibling;
       var next = br.nextSibling;
-      var prevIsBlock = prev && prev.nodeType === 1 && /^(UL|OL|LI|P|DIV|H[1-6]|TABLE)$/.test(prev.tagName);
-      var nextIsBlock = next && next.nodeType === 1 && /^(UL|OL|LI|P|DIV|H[1-6]|TABLE)$/.test(next.tagName);
-      if (prevIsBlock || nextIsBlock) br.remove();
+      function isBlock(n) {
+        return n && n.nodeType === 1 && /^(UL|OL|LI|P|DIV|H[1-6]|TABLE|TR|TD|TH)$/.test(n.tagName);
+      }
+      if (isBlock(prev) || isBlock(next)) br.remove();
+    });
+
+    // 4) ul/ol 사이의 텍스트 노드가 공백뿐인 경우 제거 (렌더링 여백 방지)
+    root.querySelectorAll('ul, ol').forEach(function(list) {
+      Array.from(list.parentNode.childNodes).forEach(function(node) {
+        if (node.nodeType === 3 && !node.textContent.trim()) {
+          node.parentNode.removeChild(node);
+        }
+      });
     });
 
     html = root.innerHTML;

@@ -187,11 +187,12 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-body h4,.modal-body h5{font-size:13px;font-weight:600;margin:10px 0 4px;}
 .modal-body p{margin-bottom:6px;color:var(--text);}
 .modal-body p:empty{display:none;}
-.modal-body li p,.modal-body li span,.modal-body li div{margin:0;padding:0;display:inline;}
+.modal-body li p,.modal-body li span,.modal-body li div{margin:0!important;padding:0!important;display:inline;}
 .modal-body li p:empty,.modal-body li span:empty{display:none;}
-.modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:6px;margin-top:2px;}
-.modal-body li{margin-bottom:2px!important;margin-top:0!important;padding-top:0!important;padding-bottom:0!important;color:var(--text);}
-.modal-body li *{margin-top:0!important;}
+.modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:4px;margin-top:2px;}
+.modal-body li ul,.modal-body li ol{margin-top:2px!important;margin-bottom:0!important;padding-left:18px;}
+.modal-body li{margin-bottom:2px!important;margin-top:0!important;padding:0!important;color:var(--text);}
+.modal-body li *{margin-top:0!important;margin-bottom:0!important;}
 .modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;table-layout:auto;}
 .modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;white-space:nowrap;color:var(--text);vertical-align:middle;}
 .modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text);text-align:left;vertical-align:top;word-break:keep-all;line-height:1.6;}
@@ -1194,7 +1195,14 @@ async function openModal(id) {
       if (isBlock(prev) || isBlock(next)) br.remove();
     });
 
-    // 4) ul/ol 사이의 텍스트 노드가 공백뿐인 경우 제거 (렌더링 여백 방지)
+    // 4) li 안의 마지막 br 제거 (언래핑 후 남은 <br> 제거)
+    root.querySelectorAll('li br').forEach(function(br) {
+      // li의 마지막 자식이거나, br 앞뒤가 텍스트/인라인 요소가 아니면 제거
+      var isLast = !br.nextSibling || !br.nextSibling.textContent.trim();
+      if (isLast) br.remove();
+    });
+
+    // 5) ul/ol 사이의 텍스트 노드가 공백뿐인 경우 제거 (렌더링 여백 방지)
     root.querySelectorAll('ul, ol').forEach(function(list) {
       Array.from(list.parentNode.childNodes).forEach(function(node) {
         if (node.nodeType === 3 && !node.textContent.trim()) {

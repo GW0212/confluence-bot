@@ -187,12 +187,24 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-body h4,.modal-body h5{font-size:13px;font-weight:600;margin:10px 0 4px;}
 .modal-body p{margin-bottom:6px;color:var(--text);}
 .modal-body p:empty{display:none;}
-.modal-body li p,.modal-body li span,.modal-body li div{margin:0!important;padding:0!important;display:inline;}
-.modal-body li p:empty,.modal-body li span:empty{display:none;}
-.modal-body ul,.modal-body ol{padding-left:22px;margin-bottom:4px;margin-top:2px;}
-.modal-body li ul,.modal-body li ol{margin-top:2px!important;margin-bottom:0!important;padding-left:18px;}
-.modal-body li{margin-bottom:2px!important;margin-top:0!important;padding:0!important;color:var(--text);}
-.modal-body li *{margin-top:0!important;margin-bottom:0!important;}
+/* li 내부 여백 완전 제거 - Confluence의 p 감싸기 패턴 대응 */
+.modal-body ul, .modal-body ol { padding-left:22px; margin:4px 0; }
+.modal-body li > p,
+.modal-body li > div,
+.modal-body li > span,
+.modal-body li > strong,
+.modal-body li > em {
+  display:inline;margin:0!important;padding:0!important;
+}
+.modal-body li > p:empty { display:none; }
+.modal-body li {
+  margin-bottom:2px!important;margin-top:0!important;
+  padding:0!important;color:var(--text);line-height:1.65;
+}
+/* 중첩 ul/ol은 별도 처리 (li * 로 건드리면 중첩 목록도 영향받음) */
+.modal-body li > ul, .modal-body li > ol {
+  margin:2px 0 0 0!important;padding-left:18px;display:block;
+}
 .modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;table-layout:auto;}
 .modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;white-space:nowrap;color:var(--text);vertical-align:middle;}
 .modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text);text-align:left;vertical-align:top;word-break:keep-all;line-height:1.6;}
@@ -1090,16 +1102,8 @@ async function openModal(id) {
     var doc = parser.parseFromString('<div id="root">' + html + '</div>', 'text/html');
     var root = doc.getElementById('root');
 
-    // 디버그: 실제 첨부파일 링크 구조 출력
-    var allLinks = root.querySelectorAll('a[href]');
-    allLinks.forEach(function(a) {
-      var href = a.getAttribute('href') || '';
-      if (href.includes('download') || href.includes('attach')) {
-        console.log('[첨부파일 링크]', 'href:', href, '| text:', a.textContent.trim().substring(0,50));
-      }
-    });
-    // 링크가 없으면 전체 HTML 앞부분 출력
-    if (allLinks.length === 0) console.log('[디버그] 링크 없음, HTML 앞부분:', html.substring(0,500));
+
+
 
     // 파일 업로드 폼 영역 제거 (끌어다 놓기, 파일 선택, 업로드 버튼 등)
     root.querySelectorAll(
@@ -1153,65 +1157,47 @@ async function openModal(id) {
     root.querySelectorAll('a[href*="/download/attachments/"], a[href*="/wiki/download/"]').forEach(function(a) {
       var href = a.getAttribute('href') || '';
       if (href.startsWith('/')) href = creds.base + href;
-      // 파일명은 href URL에서 추출 (텍스트에 "마이크로소프트 엑셀 스프레드시트" 같은 불필요한 문구가 섞이므로)
       var hrefFilename = decodeURIComponent(href.split('/').pop().split('?')[0]);
-      var filename = hrefFilename || a.textContent.trim() || '파일 다운로드';
+      var filename = hrefFilename || a.textContent.trim() || '첨부파일';
       var ext = filename.split('.').pop().toLowerCase();
-      var proxyUrl = API + '/api/attachment?url=' + encodeURIComponent(href) +
-        '&email=' + encodeURIComponent(creds.email) +
-        '&token=' + encodeURIComponent(creds.token);
+      var proxyUrl = API + '/api/attachment?url=' + encodeURIComponent(href) + '&email=' + encodeURIComponent(creds.email) + '&token=' + encodeURIComponent(creds.token);
 
       if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) {
-        // 이미지: 인라인 미리보기
+        // 이미지: 프록시로 인라인 표시
         var previewImg = doc.createElement('img');
         previewImg.setAttribute('src', proxyUrl);
         previewImg.style.cssText = 'max-width:100%;border-radius:6px;margin:8px 0;cursor:zoom-in;display:block;';
         previewImg.title = filename;
         previewImg.onerror = function() {
           this.style.display = 'none';
-          var msg = doc.createElement('span');
-          msg.style.cssText = 'color:var(--text-muted);font-size:12px;';
-          msg.textContent = '🖼️ 이미지 로드 실패: ' + filename;
+          var msg = doc.createElement('div');
+          msg.style.cssText = 'color:var(--text-muted);font-size:12px;padding:4px 0;';
+          msg.textContent = '🖼️ 이미지를 불러올 수 없어요: ' + filename;
           this.parentNode && this.parentNode.insertBefore(msg, this);
         };
         a.parentNode && a.parentNode.replaceChild(previewImg, a);
-
-      } else if (['xlsx','xls'].includes(ext)) {
-        var xlsxProxyUrl = proxyUrl + '&filename=' + encodeURIComponent(filename);
-        var dlBtn = doc.createElement('button');
-        dlBtn.type = 'button';
-        dlBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;margin:6px 0;';
-        dlBtn.innerHTML = '📊 ' + escHtml(filename) + ' <span style="font-size:11px;color:var(--text-muted);">(클릭하여 다운로드)</span>';
-        (function(btn, pu) {
-          btn.addEventListener('click', function() { window.location.href = pu; });
-        })(dlBtn, xlsxProxyUrl);
-        a.parentNode && a.parentNode.replaceChild(dlBtn, a);
-
       } else {
-        var icon = ext === 'pdf' ? '📄' : ext === 'pptx' || ext === 'ppt' ? '📑' : ext === 'docx' || ext === 'doc' ? '📝' : ext === 'png' || ext === 'jpg' || ext === 'jpeg' ? '🖼️' : '📎';
-        var otherProxyUrl = proxyUrl + '&filename=' + encodeURIComponent(filename);
-        var otherBtn = doc.createElement('button');
-        otherBtn.type = 'button';
-        otherBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;margin:4px 0;';
-        otherBtn.innerHTML = icon + ' ' + escHtml(filename) + ' <span style="font-size:11px;color:var(--text-muted);">(다운로드)</span>';
-        (function(btn, pu) {
-          btn.addEventListener('click', function() { window.location.href = pu; });
-        })(otherBtn, otherProxyUrl);
-        a.parentNode && a.parentNode.replaceChild(otherBtn, a);
+        // 엑셀·PDF·기타 파일: 다운로드/미리보기는 Confluence 원본 페이지에서 가능하다고 안내
+        var icon = ['xlsx','xls'].includes(ext) ? '📊' : ext === 'pdf' ? '📄' : ext === 'pptx' || ext === 'ppt' ? '📑' : ext === 'docx' || ext === 'doc' ? '📝' : '📎';
+        var notice = doc.createElement('span');
+        notice.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);padding:2px 0;';
+        notice.innerHTML = icon + ' <b style="color:var(--text);font-size:13px;">' + escHtml(filename) + '</b> — 미리보기·다운로드는 <a href="' + escHtml(pg.pageUrl || creds.base) + '" target="_blank" style="color:var(--accent);text-decoration:underline;">Confluence 원본 페이지</a>에서 가능해요.';
+        a.parentNode && a.parentNode.replaceChild(notice, a);
       }
     });
 
     // ── HTML 정제: Confluence 특유의 불필요한 여백/태그 제거 ──
 
-    // 1) li 안의 p를 무조건 언래핑 (li > p > 내용 → li > 내용)
-    //    Confluence는 li 안에 p를 감싸는 경우가 많아 li 사이 여백이 생김
-    root.querySelectorAll('li p').forEach(function(p) {
-      while (p.firstChild) p.parentNode.insertBefore(p.firstChild, p);
-      p.remove();
+    // 1) li 안의 블록 요소(p, div) 언래핑 - 내용을 li 직접 자식으로 올림
+    //    Confluence는 <li><p>내용</p></li> 구조를 자주 만들어서 줄간격이 생김
+    root.querySelectorAll('li > p, li > div').forEach(function(el) {
+      // ul/ol은 건드리지 않음 (중첩 목록)
+      while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+      el.remove();
     });
 
-    // 1-1) li, ul, ol의 인라인 style 제거 (Confluence가 margin-bottom 등을 직접 삽입하는 경우 대비)
-    root.querySelectorAll('li, ul, ol').forEach(function(el) {
+    // 1-1) li, ul, ol, p의 인라인 style 제거 (Confluence가 margin 등을 직접 삽입)
+    root.querySelectorAll('li, ul, ol, p').forEach(function(el) {
       el.removeAttribute('style');
     });
 

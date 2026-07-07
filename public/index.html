@@ -1140,24 +1140,72 @@ async function openModal(id) {
         a.parentNode && a.parentNode.replaceChild(previewImg, a);
 
       } else if (['xlsx','xls'].includes(ext)) {
-        // Excel: 프록시 URL에 filename 파라미터 추가해서 직접 다운로드
-        var xlsxUrl = proxyUrl + '&filename=' + encodeURIComponent(filename);
-        var dlBtn = doc.createElement('a');
-        dlBtn.setAttribute('href', xlsxUrl);
-        dlBtn.setAttribute('target', '_blank');
-        dlBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;text-decoration:none;margin:6px 0;cursor:pointer;';
+        var xlsxProxyUrl = proxyUrl + '&filename=' + encodeURIComponent(filename);
+        var dlBtn = doc.createElement('button');
+        dlBtn.type = 'button';
+        dlBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;margin:6px 0;';
         dlBtn.innerHTML = '📊 ' + escHtml(filename) + ' <span style="font-size:11px;color:var(--text-muted);">(클릭하여 다운로드)</span>';
+        (function(btn, pu, fn) {
+          btn.addEventListener('click', function() {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            fetch(pu)
+              .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.blob();
+              })
+              .then(function(blob) {
+                var blobUrl = URL.createObjectURL(blob);
+                var tmp = document.createElement('a');
+                tmp.href = blobUrl;
+                tmp.download = fn;
+                tmp.style.display = 'none';
+                document.body.appendChild(tmp);
+                tmp.click();
+                document.body.removeChild(tmp);
+                setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 3000);
+                btn.disabled = false;
+                btn.style.opacity = '1';
+              })
+              .catch(function(e) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                alert('다운로드 실패: ' + e.message + '\n직접 링크로 시도합니다.');
+                window.open(pu, '_blank');
+              });
+          });
+        })(dlBtn, xlsxProxyUrl, filename);
         a.parentNode && a.parentNode.replaceChild(dlBtn, a);
 
 
       } else {
-        // 그 외 파일: 다운로드 링크
-        var icon = ext === 'pdf' ? '📄' : ext === 'pptx' || ext === 'ppt' ? '📑' : ext === 'docx' || ext === 'doc' ? '📝' : '📎';
-        a.setAttribute('href', proxyUrl + '&filename=' + encodeURIComponent(filename));
-        a.setAttribute('target', '_blank');
-        a.removeAttribute('download');
-        a.removeAttribute('rel');
-        if (!a.textContent.startsWith(icon)) a.textContent = icon + ' ' + a.textContent;
+        // 그 외 파일(png, pdf, docx 등): fetch+Blob 다운로드
+        var icon = ext === 'pdf' ? '📄' : ext === 'pptx' || ext === 'ppt' ? '📑' : ext === 'docx' || ext === 'doc' ? '📝' : ext === 'png' || ext === 'jpg' || ext === 'jpeg' ? '🖼️' : '📎';
+        var otherProxyUrl = proxyUrl + '&filename=' + encodeURIComponent(filename);
+        var otherBtn = doc.createElement('button');
+        otherBtn.type = 'button';
+        otherBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;margin:4px 0;';
+        otherBtn.innerHTML = icon + ' ' + escHtml(filename) + ' <span style="font-size:11px;color:var(--text-muted);">(다운로드)</span>';
+        (function(btn, pu, fn) {
+          btn.addEventListener('click', function() {
+            btn.disabled = true; btn.style.opacity = '0.6';
+            fetch(pu)
+              .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+              .then(function(blob) {
+                var blobUrl = URL.createObjectURL(blob);
+                var tmp = document.createElement('a');
+                tmp.href = blobUrl; tmp.download = fn; tmp.style.display = 'none';
+                document.body.appendChild(tmp); tmp.click(); document.body.removeChild(tmp);
+                setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 3000);
+                btn.disabled = false; btn.style.opacity = '1';
+              })
+              .catch(function(e) {
+                btn.disabled = false; btn.style.opacity = '1';
+                window.open(pu, '_blank');
+              });
+          });
+        })(otherBtn, otherProxyUrl, filename);
+        a.parentNode && a.parentNode.replaceChild(otherBtn, a);
       }
     });
 

@@ -196,6 +196,9 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-body table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;table-layout:auto;}
 .modal-body th{background:var(--surface2);padding:8px 12px;border:1px solid var(--border);font-weight:600;text-align:left;white-space:nowrap;color:var(--text);vertical-align:middle;}
 .modal-body td{padding:7px 12px;border:1px solid var(--border);color:var(--text);text-align:left;vertical-align:top;word-break:keep-all;line-height:1.6;}
+.modal-body td ul,.modal-body td ol{margin:0!important;padding-left:16px;}
+.modal-body td li{margin:0!important;padding:0!important;}
+.modal-body td p{margin:0!important;padding:0!important;}
 .modal-body tr:nth-child(even) td{background:rgba(0,0,0,.02);}
 .modal-body tr:hover td{background:rgba(58,111,247,.05);}
 .modal-body strong,.modal-body b{font-weight:600;color:var(--text);}
@@ -1093,6 +1096,27 @@ async function openModal(id) {
       '[data-testid*="upload"], .confluence-information-macro-note'
     ).forEach(function(el){ el.remove(); });
 
+    // Confluence 첨부파일 매크로 UI 제거
+    // "레이블 없음", "레이블 편집", "Preview 보기 속성" 같은 셀은 기획 내용이 아닌 Confluence UI
+    root.querySelectorAll('td').forEach(function(td) {
+      var text = td.textContent.trim();
+      if (text === '레이블' || text.startsWith('레이블없음') || text.startsWith('레이블 없음') ||
+          /^(레이블\s*레이블\s*없음|Preview\s*보기|모두\s*다운로드)/.test(text)) {
+        var tr = td.closest('tr');
+        if (tr) tr.remove();
+      }
+    });
+    // 첨부파일 매크로 테이블에서 "파일"/"변경됨" 헤더만 남은 경우 테이블 자체 제거
+    root.querySelectorAll('table').forEach(function(tbl) {
+      var ths = Array.from(tbl.querySelectorAll('th'));
+      var thTexts = ths.map(function(th){ return th.textContent.trim(); }).join(',');
+      if (thTexts === '파일,변경됨' || thTexts === ',파일,변경됨') {
+        // 파일/변경됨 헤더 테이블: tr이 없으면(내용 다 지워진) 테이블 제거
+        var dataRows = tbl.querySelectorAll('tbody tr');
+        if (dataRows.length === 0) tbl.remove();
+      }
+    });
+
     // 변경 이력 섹션 제거
     root.querySelectorAll(
       '[class*="page-metadata"], [class*="recently-updated"], [class*="modification"]'
@@ -1118,8 +1142,10 @@ async function openModal(id) {
     root.querySelectorAll('a[href*="/download/attachments/"], a[href*="/wiki/download/"]').forEach(function(a) {
       var href = a.getAttribute('href') || '';
       if (href.startsWith('/')) href = creds.base + href;
-      var filename = a.textContent.trim() || '파일 다운로드';
-      var ext = filename.split('.').pop().toLowerCase().split('?')[0];
+      // 파일명은 href URL에서 추출 (텍스트에 "마이크로소프트 엑셀 스프레드시트" 같은 불필요한 문구가 섞이므로)
+      var hrefFilename = decodeURIComponent(href.split('/').pop().split('?')[0]);
+      var filename = hrefFilename || a.textContent.trim() || '파일 다운로드';
+      var ext = filename.split('.').pop().toLowerCase();
       var proxyUrl = API + '/api/attachment?url=' + encodeURIComponent(href) +
         '&email=' + encodeURIComponent(creds.email) +
         '&token=' + encodeURIComponent(creds.token);
@@ -1145,66 +1171,21 @@ async function openModal(id) {
         dlBtn.type = 'button';
         dlBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;margin:6px 0;';
         dlBtn.innerHTML = '📊 ' + escHtml(filename) + ' <span style="font-size:11px;color:var(--text-muted);">(클릭하여 다운로드)</span>';
-        (function(btn, pu, fn) {
-          btn.addEventListener('click', function() {
-            btn.disabled = true;
-            btn.style.opacity = '0.6';
-            fetch(pu)
-              .then(function(r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.blob();
-              })
-              .then(function(blob) {
-                var blobUrl = URL.createObjectURL(blob);
-                var tmp = document.createElement('a');
-                tmp.href = blobUrl;
-                tmp.download = fn;
-                tmp.style.display = 'none';
-                document.body.appendChild(tmp);
-                tmp.click();
-                document.body.removeChild(tmp);
-                setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 3000);
-                btn.disabled = false;
-                btn.style.opacity = '1';
-              })
-              .catch(function(e) {
-                btn.disabled = false;
-                btn.style.opacity = '1';
-                alert('다운로드 실패: ' + e.message + '\n직접 링크로 시도합니다.');
-                window.open(pu, '_blank');
-              });
-          });
-        })(dlBtn, xlsxProxyUrl, filename);
+        (function(btn, pu) {
+          btn.addEventListener('click', function() { window.location.href = pu; });
+        })(dlBtn, xlsxProxyUrl);
         a.parentNode && a.parentNode.replaceChild(dlBtn, a);
 
-
       } else {
-        // 그 외 파일(png, pdf, docx 등): fetch+Blob 다운로드
         var icon = ext === 'pdf' ? '📄' : ext === 'pptx' || ext === 'ppt' ? '📑' : ext === 'docx' || ext === 'doc' ? '📝' : ext === 'png' || ext === 'jpg' || ext === 'jpeg' ? '🖼️' : '📎';
         var otherProxyUrl = proxyUrl + '&filename=' + encodeURIComponent(filename);
         var otherBtn = doc.createElement('button');
         otherBtn.type = 'button';
         otherBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;margin:4px 0;';
         otherBtn.innerHTML = icon + ' ' + escHtml(filename) + ' <span style="font-size:11px;color:var(--text-muted);">(다운로드)</span>';
-        (function(btn, pu, fn) {
-          btn.addEventListener('click', function() {
-            btn.disabled = true; btn.style.opacity = '0.6';
-            fetch(pu)
-              .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
-              .then(function(blob) {
-                var blobUrl = URL.createObjectURL(blob);
-                var tmp = document.createElement('a');
-                tmp.href = blobUrl; tmp.download = fn; tmp.style.display = 'none';
-                document.body.appendChild(tmp); tmp.click(); document.body.removeChild(tmp);
-                setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 3000);
-                btn.disabled = false; btn.style.opacity = '1';
-              })
-              .catch(function(e) {
-                btn.disabled = false; btn.style.opacity = '1';
-                window.open(pu, '_blank');
-              });
-          });
-        })(otherBtn, otherProxyUrl, filename);
+        (function(btn, pu) {
+          btn.addEventListener('click', function() { window.location.href = pu; });
+        })(otherBtn, otherProxyUrl);
         a.parentNode && a.parentNode.replaceChild(otherBtn, a);
       }
     });

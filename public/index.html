@@ -1090,6 +1090,17 @@ async function openModal(id) {
     var doc = parser.parseFromString('<div id="root">' + html + '</div>', 'text/html');
     var root = doc.getElementById('root');
 
+    // 디버그: 실제 첨부파일 링크 구조 출력
+    var allLinks = root.querySelectorAll('a[href]');
+    allLinks.forEach(function(a) {
+      var href = a.getAttribute('href') || '';
+      if (href.includes('download') || href.includes('attach')) {
+        console.log('[첨부파일 링크]', 'href:', href, '| text:', a.textContent.trim().substring(0,50));
+      }
+    });
+    // 링크가 없으면 전체 HTML 앞부분 출력
+    if (allLinks.length === 0) console.log('[디버그] 링크 없음, HTML 앞부분:', html.substring(0,500));
+
     // 파일 업로드 폼 영역 제거 (끌어다 놓기, 파일 선택, 업로드 버튼 등)
     root.querySelectorAll(
       'form, input[type="file"], .label-editor, [class*="upload"], [class*="drag-drop"], ' +

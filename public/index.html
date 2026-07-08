@@ -190,18 +190,20 @@ textarea::placeholder{color:var(--text-dim);}
 /* li 내부 여백 완전 제거 - Confluence의 p 감싸기 패턴 대응 */
 .modal-body ul, .modal-body ol { padding-left:22px; margin:4px 0; }
 .modal-body li > p,
-.modal-body li > div,
+.modal-body li > div:not(ul):not(ol),
 .modal-body li > span,
 .modal-body li > strong,
-.modal-body li > em {
-  display:inline;margin:0!important;padding:0!important;
+.modal-body li > em,
+.modal-body li > a,
+.modal-body li > code {
+  display:inline!important;margin:0!important;padding:0!important;
 }
-.modal-body li > p:empty { display:none; }
+.modal-body li > p:empty, .modal-body li > div:empty { display:none!important; }
 .modal-body li {
-  margin-bottom:2px!important;margin-top:0!important;
-  padding:0!important;color:var(--text);line-height:1.65;
+  margin-bottom:3px!important;margin-top:0!important;
+  padding:0!important;color:var(--text);line-height:1.7;
 }
-/* 중첩 ul/ol은 별도 처리 (li * 로 건드리면 중첩 목록도 영향받음) */
+/* 중첩 ul/ol은 반드시 block */
 .modal-body li > ul, .modal-body li > ol {
   margin:2px 0 0 0!important;padding-left:18px;display:block;
 }
@@ -1105,31 +1107,31 @@ async function openModal(id) {
 
 
 
-    // 파일 업로드 폼 영역 제거 (끌어다 놓기, 파일 선택, 업로드 버튼 등)
-    root.querySelectorAll(
-      'form, input[type="file"], .label-editor, [class*="upload"], [class*="drag-drop"], ' +
-      '[data-testid*="upload"], .confluence-information-macro-note'
-    ).forEach(function(el){ el.remove(); });
+    // Confluence UI 완전 제거 - 기획 내용이 아닌 모든 UI 요소
+    var removeSelectors = [
+      'form', 'input[type="file"]', 'iframe',
+      '.label-editor', '[class*="label-editor"]',
+      '[class*="upload"]', '[class*="drag-drop"]', '[data-testid*="upload"]',
+      '[class*="view-file"]', '[class*="spreadsheet"]', '[class*="sheet-wrap"]',
+      '[class*="file-wrap"]', '[class*="office-viewer"]', '[class*="viewfile"]',
+      '[data-macro-name="view-file"]', '[data-macro-name="viewfile"]',
+      '[class*="attachment"]', '[class*="attachments"]',
+      '[data-macro-name="attachments"]',
+      '.confluence-information-macro-note'
+    ].join(', ');
+    root.querySelectorAll(removeSelectors).forEach(function(el){ el.remove(); });
 
-    // Confluence 첨부파일 매크로 UI 제거
-    // "레이블 없음", "레이블 편집", "Preview 보기 속성" 같은 셀은 기획 내용이 아닌 Confluence UI
+    // 레이블/Preview/모두 다운로드 행 제거
     root.querySelectorAll('td').forEach(function(td) {
       var text = td.textContent.trim();
-      if (text === '레이블' || text.startsWith('레이블없음') || text.startsWith('레이블 없음') ||
-          /^(레이블\s*레이블\s*없음|Preview\s*보기|모두\s*다운로드)/.test(text)) {
+      if (/^레이블/.test(text) || /^Preview/.test(text) || /^모두\s*다운로드/.test(text)) {
         var tr = td.closest('tr');
         if (tr) tr.remove();
       }
     });
-    // 첨부파일 매크로 테이블에서 "파일"/"변경됨" 헤더만 남은 경우 테이블 자체 제거
+    // 내용 없어진 테이블 제거
     root.querySelectorAll('table').forEach(function(tbl) {
-      var ths = Array.from(tbl.querySelectorAll('th'));
-      var thTexts = ths.map(function(th){ return th.textContent.trim(); }).join(',');
-      if (thTexts === '파일,변경됨' || thTexts === ',파일,변경됨') {
-        // 파일/변경됨 헤더 테이블: tr이 없으면(내용 다 지워진) 테이블 제거
-        var dataRows = tbl.querySelectorAll('tbody tr');
-        if (dataRows.length === 0) tbl.remove();
-      }
+      if (!tbl.textContent.trim()) tbl.remove();
     });
 
     // 변경 이력 섹션 제거

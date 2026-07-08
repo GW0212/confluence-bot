@@ -19,56 +19,55 @@ export default async function handler(req, res) {
     const data = await response.json();
     const rawHtml = data.body?.view?.value || '';
 
-    let text = rawHtml;
-
-    // 1) 스크립트/스타일/매크로 블록 등 텍스트로 변환할 가치 없는 영역을 통째로 제거
-    text = text
+    // ── HTML 정제 (서버에서 미리 처리해서 클라이언트 부담 감소) ──
+    let cleanHtml = rawHtml
+      // 스크립트/스타일 블록 제거
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<script[\s\S]*?<\/script>/gi, '')
+      // Confluence 매크로 파라미터 제거
       .replace(/<ac:parameter[\s\S]*?<\/ac:parameter>/gi, '')
       .replace(/<ac:plain-text-body>[\s\S]*?<\/ac:plain-text-body>/gi, '')
-      // Confluence 변경이력(page-metadata-modification) 블록 통째로 제거
-      // — 작성자·수정자·날짜·파일명 등 메타 정보가 담긴 영역이므로 텍스트 추출 대상에서 배제
-      .replace(/<div[^>]*page-metadata-modification[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*recently-updated[^>]*>[\s\S]*?<\/div>/gi, '')
+      // 변경이력/메타데이터 블록 통째로 제거
       .replace(/<div[^>]*page-metadata[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/\s(style|data-[\w-]+)="[^"]*"/gi, '')
-      .replace(/\s(style|data-[\w-]+)='[^']*'/gi, '');
+      .replace(/<div[^>]*recently-updated[^>]*>[\s\S]*?<\/div>/gi, '')
+      // ★ 모든 요소의 style 속성 제거 (줄바꿈 버그 핵심 원인)
+      .replace(/\s+style="[^"]*"/gi, '')
+      .replace(/\s+style='[^']*'/gi, '')
+      // data-* 속성 제거
+      .replace(/\s+data-[\w-]+="[^"]*"/gi, '')
+      .replace(/\s+data-[\w-]+='[^']*'/gi, '')
+      // class 속성 제거 (Confluence 자체 CSS가 있으면 충돌하므로)
+      .replace(/\s+class="[^"]*"/gi, '')
+      .replace(/\s+class='[^']*'/gi, '')
+      // CSS 아티팩트 텍스트 제거
+      .replace(/\[?data-[\w-]+=[^\]\s{]*\]?\s*\{[^}]*\}/gi, '')
+      .replace(/\{color:#?[0-9a-fA-F]{3,6}\}/gi, '')
+      .replace(/\b[\w-]+\[data-[\w-]+(?:=[^\]]*)?\]/gi, '')
+      // 변경이력 문장 제거
+      .replace(/\S+\.(xlsx|docx|pptx|pdf|hwp|zip|csv|png|jpg)\s+파일[이이]?\s+\S+에\s+의해\s+변경되었습니다\.?/gi, '');
 
-    // 2) 줄바꿈이 되어야 할 구조적 태그를 개행으로 변환
-    text = text
+    // 텍스트용 content 생성
+    let text = cleanHtml
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/p>/gi, '\n')
       .replace(/<\/li>/gi, '\n')
       .replace(/<\/tr>/gi, '\n')
       .replace(/<\/h[1-6]>/gi, '\n')
-      .replace(/<\/div>/gi, '\n');
-
-    // 3) 남은 모든 HTML 태그 제거 (속성은 이미 위에서 정리됐으므로 안전)
-    text = text.replace(/<[^>]+>/g, '');
-
-    // 4) HTML 엔티티 디코딩은 태그 제거가 끝난 "이후"에 수행
-    //    (태그 제거 전에 디코딩하면 &lt;div&gt; 같은 안전한 이스케이프 텍스트가
-    //     실제 태그처럼 되살아나 다시 노출되는 문제가 있었음 — 순서가 핵심)
-    text = text
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
       .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '')   // 디코딩된 부등호가 다시 태그처럼 보이는 걸 막기 위해 제거(복원 대신 삭제)
-      .replace(/&gt;/g, '');
-
-    // 5) 공백/개행 정리
-    text = text
+      .replace(/&lt;/g, '')
+      .replace(/&gt;/g, '')
       .replace(/\t/g, ' ')
       .replace(/[ \t]+/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    // Confluence 페이지 직접 URL
     const pageUrl = `${baseUrl}/wiki/spaces/${data.space?.key || ''}/pages/${pageId}`;
-
-    res.json({ success: true, title: data.title, content: text, html: rawHtml, pageUrl });
+    res.json({ success: true, title: data.title, content: text, html: cleanHtml, pageUrl });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

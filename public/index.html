@@ -1198,8 +1198,8 @@ async function openModal(id) {
       el.remove();
     });
 
-    // 1-1) li, ul, ol, p의 인라인 style 제거 (Confluence가 margin 등을 직접 삽입)
-    root.querySelectorAll('li, ul, ol, p').forEach(function(el) {
+    // 1-1) 모든 요소의 인라인 style 제거 (서버에서 이미 제거했지만 이중 방어)
+    root.querySelectorAll('[style]').forEach(function(el) {
       el.removeAttribute('style');
     });
 

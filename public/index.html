@@ -1083,8 +1083,8 @@ async function openModal(id) {
   var body = document.getElementById('modal-body');
   body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">불러오는 중...</div>';
 
-  // html 없으면 fetch (이미 위에서 새로 가져온 경우는 pg.html이 있으므로 스킵됨)
-  if (!pg.html && creds.email && creds.token) {
+  // 항상 최신 html을 서버에서 새로 받음 (캐시 html은 이전 버전일 수 있어 무시)
+  if (creds.email && creds.token) {
     try {
       var r = await fetch(API + '/api/page-content', {
         method: 'POST', headers: {'Content-Type':'application/json'},
@@ -1239,9 +1239,18 @@ async function openModal(id) {
       });
     });
 
+    // MSO(Microsoft Office) CSS 텍스트가 본문에 노출되는 경우 제거
+    // 엑셀 붙여넣기로 생긴 <style>태그가 텍스트로 렌더링된 패턴
+    root.querySelectorAll('p, div, td, span').forEach(function(el) {
+      var t = el.textContent || '';
+      if (/mso-[\w-]+:|font-family.*monospace|\.style\d+\s*\{/.test(t) && t.length > 100) {
+        el.remove();
+      }
+    });
+
     html = root.innerHTML;
     body.innerHTML = html;
-    body.scrollTop = 0; // 다른 기획서로 이동 시 스크롤 초기화
+    body.scrollTop = 0;
 
     // creds.base의 호스트명을 추출해서, "같은 Confluence 사이트로 가는 링크인지" 판별
     var baseHost = '';

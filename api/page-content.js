@@ -44,7 +44,10 @@ export default async function handler(req, res) {
       .replace(/\{color:#?[0-9a-fA-F]{3,6}\}/gi, '')
       .replace(/\b[\w-]+\[data-[\w-]+(?:=[^\]]*)?\]/gi, '')
       // 변경이력 문장 제거
-      .replace(/\S+\.(xlsx|docx|pptx|pdf|hwp|zip|csv|png|jpg)\s+파일[이이]?\s+\S+에\s+의해\s+변경되었습니다\.?/gi, '');
+      .replace(/\S+\.(xlsx|docx|pptx|pdf|hwp|zip|csv|png|jpg)\s+파일[이이]?\s+\S+에\s+의해\s+변경되었습니다\.?/gi, '')
+      // MSO(Microsoft Office) 스타일 CSS 텍스트 제거 - 엑셀 붙여넣기 잔재
+      .replace(/<[^>]*>\s*<style[^>]*>[\s\S]*?<\/style>\s*<\/[^>]*>/gi, '')
+      .replace(/mso-[\w-]+:[^;}"'<]{1,200};/g, '');
 
     // 텍스트용 content 생성
     let text = cleanHtml

@@ -1263,10 +1263,11 @@ async function openModal(id) {
     body.scrollTop = 0;
 
     // 렌더링 후 실질적인 내용이 없으면 안내 메시지 표시
+    // pageUrl: fetch 결과 > pageStore 값 > 직접 계산 순으로 사용
+    var pageOrigUrl = pg.pageUrl || (creds.base + '/wiki/spaces/' + creds.space + '/pages/' + id);
     var bodyText = body.innerText ? body.innerText.trim() : body.textContent.trim();
     if (!bodyText || bodyText.length < 10) {
-      var pageOrigUrl = pg.pageUrl || (creds.base + '/wiki/spaces/' + creds.space + '/pages/' + id);
-      body.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:14px;">📎 이 페이지에는 첨부파일이 포함되어 있어요.<br><br>미리보기·다운로드는 <a href="' + pageOrigUrl + '" target="_blank" style="color:var(--accent);">Confluence 원본 페이지</a>에서 가능해요.</div>';
+      body.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:14px;">📎 이 페이지에는 첨부파일이 포함되어 있어요.<br><br>미리보기·다운로드는 <a href="' + pageOrigUrl + '" target="_blank" data-external="true" style="color:var(--accent);">Confluence 원본 페이지</a>에서 가능해요.</div>';
     }
 
     // creds.base의 호스트명을 추출해서, "같은 Confluence 사이트로 가는 링크인지" 판별
@@ -1276,6 +1277,7 @@ async function openModal(id) {
     body.querySelectorAll('a').forEach(function(a) {
       var href = a.getAttribute('href') || '';
       if (!href || href.startsWith('#')) return;
+      if (a.getAttribute('data-external')) return; // 외부 링크로 명시된 건 건드리지 않음
 
       var hrefHost = '';
       try { hrefHost = new URL(href, creds.base).hostname; } catch(e) {}

@@ -143,9 +143,9 @@ header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;paddin
 .bubble{max-width:90%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 20px 12px 20px;font-size:14px;line-height:1.75;box-shadow:var(--shadow);word-break:break-word;white-space:pre-wrap;}
 .msg.user .bubble{background:linear-gradient(135deg,rgba(58,111,247,.1),rgba(107,68,248,.06));border-color:rgba(58,111,247,.22);max-width:90%;}
 .bubble p{margin-bottom:7px;}.bubble p:last-child{margin-bottom:0;}
-.bubble ul,.bubble ol{padding-left:0;margin-bottom:8px;list-style:none;}
+.bubble ul,.bubble ol{padding-left:0;margin-bottom:4px;margin-top:0;list-style:none;}
 .bubble li{margin-bottom:4px;padding-left:16px;position:relative;line-height:1.75;}.bubble li::before{content:'•';position:absolute;left:4px;top:0;line-height:1.75;color:var(--text-muted);}
-.bubble li.li-sub{padding-left:28px;margin-bottom:3px;}.bubble li.li-sub::before{content:'–';left:14px;font-size:12px;color:var(--text-dim);}
+.bubble li.li-sub{padding-left:28px;margin-bottom:0;margin-top:0;}.bubble li.li-sub::before{content:'–';left:14px;font-size:12px;color:var(--text-dim);}
 .bubble strong{color:var(--accent);font-weight:600;}
 .bubble code{font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:12px;color:var(--gold);}
 .bubble h3,.bubble h4{margin:10px 0 5px;font-weight:600;}
@@ -1678,7 +1678,7 @@ function mdToHtml(t) {
   t = t.replace(/^ {2,}- (.+)$/gm,'<li class="li-sub">$1</li>');
   t = t.replace(/^- (.+)$/gm,'<li>$1</li>');
 
-  // 연속된 li 블록 사이의 빈 줄 제거 (핵심!)
+  // 연속된 li 블록 사이의 빈 줄 제거 (일반 li, li-sub 모두)
   t = t.replace(/(<\/li>)\n\n+(<li)/g, '$1\n$2');
 
   // li 묶기

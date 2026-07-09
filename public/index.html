@@ -1153,10 +1153,29 @@ async function openModal(id) {
         if (tr) tr.remove();
       }
     });
-    // 내용 없어진 테이블 제거
+    // 내용 없어진 테이블 + "파일/변경됨" 첨부파일 매크로 테이블 제거
     root.querySelectorAll('table').forEach(function(tbl) {
-      if (!tbl.textContent.trim()) tbl.remove();
+      var text = tbl.textContent.trim();
+      // 완전히 빈 테이블
+      if (!text) { tbl.remove(); return; }
+      // "파일" "변경됨" 헤더만 있는 첨부파일 매크로 테이블
+      var ths = Array.from(tbl.querySelectorAll('th, td'));
+      var thTexts = ths.map(function(el){ return el.textContent.trim(); }).filter(Boolean);
+      if (thTexts.every(function(t){ return ['파일','변경됨',''].includes(t); })) {
+        tbl.remove();
+      }
     });
+
+    // "끌어다 놓기로 업로드" 텍스트 포함된 요소 제거 (첨부파일 업로드 UI)
+    root.querySelectorAll('p, div, li').forEach(function(el) {
+      var t = el.textContent.trim();
+      if (t.includes('끌어다 놓기로 업로드') || t.includes('파일 찾아보기') || t === '끌어다 놓기로 업로드하거나') {
+        el.remove();
+      }
+    });
+
+    // 로딩 스피너 제거
+    root.querySelectorAll('[class*="spinner"], [class*="loading"], [class*="aui-icon-wait"]').forEach(function(el){ el.remove(); });
 
     // 변경 이력 섹션 제거
     root.querySelectorAll(

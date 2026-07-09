@@ -1659,24 +1659,32 @@ function mdToHtml(t) {
   var usedPages = {};
   t = t.replace(/\[\[(.+?)\]\]/g, function(_, pn) {
     var key = pn.trim().toLowerCase();
-    if (usedPages[key]) return ''; // 이미 표시된 페이지 링크는 제거
+    if (usedPages[key]) return '';
     usedPages[key] = true;
     var r = findPageByTitle(pn.trim());
     if (r) return '<a class="page-ref" href="#" onclick="event.preventDefault();openModal(\'' + r.id + '\')">📄 '+pn+'</a>';
     return '<span class="page-ref-na">📄 '+pn+'</span>';
   });
-  // 마크다운 변환 순서 중요: strong/code 먼저 → h태그 → li → ul묶기
+
+  // 헤딩
   t = t.replace(/^#### (.+)$/gm,'<h4>$1</h4>');
   t = t.replace(/^### (.+)$/gm,'<h3>$1</h3>');
   t = t.replace(/^## (.+)$/gm,'<h3>$1</h3>');
   t = t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   t = t.replace(/`([^`]+)`/g,'<code>$1</code>');
+
+  // ★ 핵심 수정: li 항목 사이의 빈 줄을 제거한 뒤 묶기
+  // Gemini가 - 항목 사이에 빈 줄을 넣어도 하나의 ul로 묶이도록
   t = t.replace(/^ {2,}- (.+)$/gm,'<li class="li-sub">$1</li>');
   t = t.replace(/^- (.+)$/gm,'<li>$1</li>');
-  // li 묶기: li-sub 포함, 태그 속성도 처리
-  t = t.replace(/(<li[^>]*>.*?<\/li>\n?)+/g, function(m){ return '<ul>'+m+'</ul>'; });
-  // 연속된 ul 병합 (빈 줄로 분리된 경우)
+
+  // 연속된 li 블록 사이의 빈 줄 제거 (핵심!)
+  t = t.replace(/(<\/li>)\n\n+(<li)/g, '$1\n$2');
+
+  // li 묶기
+  t = t.replace(/(<li[^>]*>[\s\S]*?<\/li>\n?)+/g, function(m){ return '<ul>'+m+'</ul>'; });
   t = t.replace(/<\/ul>\s*<ul>/g, '');
+
   return t.split(/\n\n+/)
     .map(function(b){ return b.trim().startsWith('<') ? b : '<p>'+b.replace(/\n/g,' ')+'</p>'; })
     .join('');

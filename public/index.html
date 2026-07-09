@@ -1369,7 +1369,7 @@ async function openModal(id) {
 
   document.getElementById('modal-ask-btn').onclick = function() {
     closeModal();
-    document.getElementById('q-input').value = '"' + pg.title + '" 페이지 내용을 자세히 설명해줘';
+    document.getElementById('q-input').value = '"' + pg.title + '" 페이지의 핵심 내용을 항목별로 구체적으로 정리해줘';
     var welcome = document.getElementById('welcome');
     if (welcome) welcome.remove();
     sendMsg();

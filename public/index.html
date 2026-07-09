@@ -1679,8 +1679,8 @@ function mdToHtml(t) {
   t = t.replace(/^ {2,}- (.+)$/gm,'<li class="li-sub">$1</li>');
   t = t.replace(/^- (.+)$/gm,'<li>$1</li>');
 
-  // 연속된 li 블록 사이의 빈 줄 제거 (일반 li, li-sub 모두)
-  t = t.replace(/(<\/li>)\n\n+(<li)/g, '$1\n$2');
+  // li/li-sub 사이 빈 줄 모두 제거 (태그 속성 무관하게 매칭)
+  t = t.replace(/(<\/li>)(\n\n+)(?=<li)/g, '$1\n');
 
   // li 묶기
   t = t.replace(/(<li[^>]*>[\s\S]*?<\/li>\n?)+/g, function(m){ return '<ul>'+m+'</ul>'; });

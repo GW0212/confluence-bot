@@ -1212,64 +1212,29 @@ async function openModal(id) {
       }
     });
 
-    // ── HTML 정제: Confluence 특유의 불필요한 여백/태그 제거 ──
+    // ── HTML 정제 (서버에서 li>p 언래핑 등 주요 처리 완료, 클라이언트는 보완만) ──
 
-    // 1) li 안의 블록 요소(p, div) 언래핑 - 내용을 li 직접 자식으로 올림
-    //    Confluence는 <li><p>내용</p></li> 구조를 자주 만들어서 줄간격이 생김
-    root.querySelectorAll('li > p, li > div').forEach(function(el) {
-      // ul/ol은 건드리지 않음 (중첩 목록)
-      while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
-      el.remove();
-    });
-
-    // 1-1) 모든 요소의 인라인 style 제거 (서버에서 이미 제거했지만 이중 방어)
+    // 혹시 남은 인라인 style 제거
     root.querySelectorAll('[style]').forEach(function(el) {
       el.removeAttribute('style');
     });
 
-    // 2) 빈 p/li/span (br, &nbsp;만 있는 것 포함) 통째로 제거
-    root.querySelectorAll('p, li, span').forEach(function(el) {
-      var inner = el.innerHTML
-        .replace(/<br\s*\/?>/gi, '')
-        .replace(/&nbsp;/gi, '')
-        .replace(/\s/g, '')
-        .trim();
+    // 빈 p/li 제거
+    root.querySelectorAll('p, li').forEach(function(el) {
+      var inner = el.innerHTML.replace(/<br\s*\/?>/gi,'').replace(/&nbsp;/gi,'').trim();
       if (!inner) el.remove();
     });
 
-    // 3) 블록 요소 앞뒤 단독 br 제거
+    // 블록 사이 단독 br 제거
     root.querySelectorAll('br').forEach(function(br) {
-      var prev = br.previousSibling;
-      var next = br.nextSibling;
-      function isBlock(n) {
-        return n && n.nodeType === 1 && /^(UL|OL|LI|P|DIV|H[1-6]|TABLE|TR|TD|TH)$/.test(n.tagName);
-      }
+      var prev = br.previousSibling, next = br.nextSibling;
+      function isBlock(n){ return n && n.nodeType===1 && /^(UL|OL|LI|P|DIV|H[1-6]|TABLE)$/.test(n.tagName); }
       if (isBlock(prev) || isBlock(next)) br.remove();
     });
 
-    // 4) li 안의 마지막 br 제거 (언래핑 후 남은 <br> 제거)
-    root.querySelectorAll('li br').forEach(function(br) {
-      // li의 마지막 자식이거나, br 앞뒤가 텍스트/인라인 요소가 아니면 제거
-      var isLast = !br.nextSibling || !br.nextSibling.textContent.trim();
-      if (isLast) br.remove();
-    });
-
-    // 5) ul/ol 사이의 텍스트 노드가 공백뿐인 경우 제거 (렌더링 여백 방지)
-    root.querySelectorAll('ul, ol').forEach(function(list) {
-      Array.from(list.parentNode.childNodes).forEach(function(node) {
-        if (node.nodeType === 3 && !node.textContent.trim()) {
-          node.parentNode.removeChild(node);
-        }
-      });
-    });
-
-    // MSO(Microsoft Office) CSS 텍스트가 본문에 노출되는 경우 제거
-    // 엑셀 붙여넣기로 생긴 <style>태그가 텍스트로 렌더링된 패턴
-    root.querySelectorAll('p, div, td, span').forEach(function(el) {
-      var t = el.textContent || '';
-      if (/mso-[\w-]+:|font-family.*monospace|\.style\d+\s*\{/.test(t) && t.length > 100) {
-        el.remove();
-      }
+    // MSO CSS 텍스트 노출 제거
+    root.querySelectorAll('p, div, td').forEach(function(el) {
+      if (/mso-[\w-]+:|\.style\d+\s*\{/.test(el.textContent||'') && (el.textContent||'').length > 100) el.remove();
     });
 
     html = root.innerHTML;

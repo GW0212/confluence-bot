@@ -1156,17 +1156,20 @@ async function openModal(id) {
     // 내용 없어진 테이블 + "파일/변경됨" 첨부파일 매크로 테이블 제거
     root.querySelectorAll('table').forEach(function(tbl) {
       var text = tbl.textContent.trim();
-      // 완전히 빈 테이블
       if (!text) { tbl.remove(); return; }
-      // "파일" "변경됨" 헤더만 있는 첨부파일 매크로 테이블
       var ths = Array.from(tbl.querySelectorAll('th, td'));
       var thTexts = ths.map(function(el){ return el.textContent.trim(); }).filter(Boolean);
       if (thTexts.every(function(t){ return ['파일','변경됨',''].includes(t); })) {
+        // 테이블 제거 후 안내 메시지로 대체
+        var notice = doc.createElement('div');
+        notice.style.cssText = 'padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-muted);margin:8px 0;';
+        notice.innerHTML = '📎 첨부파일이 있어요. 미리보기·다운로드는 <a href="' + escHtml(pg.pageUrl || '') + '" target="_blank" style="color:var(--accent);text-decoration:underline;">Confluence 원본 페이지</a>에서 가능해요.';
+        tbl.parentNode.insertBefore(notice, tbl);
         tbl.remove();
       }
     });
 
-    // "끌어다 놓기로 업로드" 텍스트 포함된 요소 제거 (첨부파일 업로드 UI)
+    // "끌어다 놓기로 업로드" 텍스트 포함된 요소 제거
     root.querySelectorAll('p, div, li').forEach(function(el) {
       var t = el.textContent.trim();
       if (t.includes('끌어다 놓기로 업로드') || t.includes('파일 찾아보기') || t === '끌어다 놓기로 업로드하거나') {

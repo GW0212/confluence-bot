@@ -1115,7 +1115,7 @@ async function openModal(id) {
         body: JSON.stringify({ email: creds.email, token: creds.token, baseUrl: creds.base, pageId: id })
       });
       var d = await r.json();
-      if (d.success) { pg.html = d.html || ''; if (d.content) pg.content = d.content; }
+      if (d.success) { pg.html = d.html || ''; if (d.content) pg.content = d.content; if (d.pageUrl) pg.pageUrl = d.pageUrl; }
     } catch(e) { console.warn('fetch 실패:', e); }
   }
 
@@ -1265,7 +1265,7 @@ async function openModal(id) {
     // 렌더링 후 실질적인 내용이 없으면 안내 메시지 표시
     var bodyText = body.innerText ? body.innerText.trim() : body.textContent.trim();
     if (!bodyText || bodyText.length < 10) {
-      var pageOrigUrl = (pg && pg.pageUrl) ? pg.pageUrl : (creds.base + '/wiki/spaces/' + creds.space + '/pages/' + id);
+      var pageOrigUrl = pg.pageUrl || (creds.base + '/wiki/spaces/' + creds.space + '/pages/' + id);
       body.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:14px;">📎 이 페이지에는 첨부파일이 포함되어 있어요.<br><br>미리보기·다운로드는 <a href="' + pageOrigUrl + '" target="_blank" style="color:var(--accent);">Confluence 원본 페이지</a>에서 가능해요.</div>';
     }
 

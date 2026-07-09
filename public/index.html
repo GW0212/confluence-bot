@@ -174,10 +174,12 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-backdrop.open{display:flex;}
 .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:1200px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.25);animation:modal-in .2s ease;}
 @keyframes modal-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
-.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;}
-.modal-title{font-size:16px;font-weight:700;color:var(--text);flex:1;line-height:1.3;}
-.modal-close{width:32px;height:32px;border:none;background:var(--surface2);border-radius:8px;cursor:pointer;font-size:15px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;flex-shrink:0;}
+.modal-title{font-size:16px;font-weight:700;color:var(--text);line-height:1.3;text-align:center;}
+.modal-close{width:32px;height:32px;border:none;background:var(--surface2);border-radius:8px;cursor:pointer;font-size:15px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;transition:background .15s;order:-1;}
 .modal-close:hover{background:var(--error);color:#fff;}
+.modal-goto{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);text-decoration:none;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap;}
+.modal-goto:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
 .modal-body{flex:1;overflow-y:auto;padding:24px 28px;font-size:14px;line-height:1.85;color:var(--text);}
 .modal-body::-webkit-scrollbar{width:5px;}
 .modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -284,6 +286,8 @@ textarea::placeholder{color:var(--text-dim);}
   .modal-box{max-width:100%;width:100%;max-height:94vh;border-radius:20px 20px 0 0;}
   .modal-box::before{content:'';display:block;width:36px;height:4px;background:var(--border);border-radius:2px;margin:10px auto 0;}
   .modal-header{padding:8px 16px 12px;}
+  .modal-goto{font-size:11px;padding:4px 8px;}
+  .modal-goto span{display:none;}
   .modal-title{font-size:14px;line-height:1.4;}
   .modal-body{padding:14px 16px;font-size:13px;line-height:1.65;}
   .modal-body h1{font-size:17px;}
@@ -416,8 +420,9 @@ textarea::placeholder{color:var(--text-dim);}
 <div class="modal-backdrop" id="page-modal">
   <div class="modal-box">
     <div class="modal-header">
-      <span class="modal-title" id="modal-title">페이지 내용</span>
       <button class="modal-close" id="modal-close-btn">✕</button>
+      <span class="modal-title" id="modal-title">페이지 내용</span>
+      <a class="modal-goto" id="modal-goto-btn" href="#" target="_blank" data-external="true">🔗 원본 페이지</a>
     </div>
     <div class="modal-body" id="modal-body"></div>
     <div class="modal-footer">
@@ -1104,6 +1109,9 @@ async function openModal(id) {
   });
 
   document.getElementById('modal-title').textContent = pg.title;
+  // 바로가기 버튼 URL 업데이트 (pg.pageUrl이 없으면 직접 계산)
+  var gotoUrl = pg.pageUrl || (creds.base + '/wiki/spaces/' + creds.space + '/pages/' + id);
+  document.getElementById('modal-goto-btn').href = gotoUrl;
   var body = document.getElementById('modal-body');
   body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">불러오는 중...</div>';
 

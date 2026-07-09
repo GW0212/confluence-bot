@@ -1154,16 +1154,15 @@ async function openModal(id) {
       }
     });
     // 내용 없어진 테이블 + "파일/변경됨" 첨부파일 매크로 테이블 제거
+    var pageOrigUrl = (pg && pg.pageUrl) ? pg.pageUrl : (creds.base + '/wiki/spaces/' + creds.space + '/pages/' + id);
     root.querySelectorAll('table').forEach(function(tbl) {
       var text = tbl.textContent.trim();
       if (!text) { tbl.remove(); return; }
       var ths = Array.from(tbl.querySelectorAll('th, td'));
       var thTexts = ths.map(function(el){ return el.textContent.trim(); }).filter(Boolean);
       if (thTexts.every(function(t){ return ['파일','변경됨',''].includes(t); })) {
-        // 테이블 제거 후 안내 메시지로 대체
-        var notice = doc.createElement('div');
-        notice.style.cssText = 'padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-muted);margin:8px 0;';
-        notice.innerHTML = '📎 첨부파일이 있어요. 미리보기·다운로드는 <a href="' + escHtml(pg.pageUrl || '') + '" target="_blank" style="color:var(--accent);text-decoration:underline;">Confluence 원본 페이지</a>에서 가능해요.';
+        var notice = doc.createElement('p');
+        notice.innerHTML = '📎 첨부파일이 있어요. 미리보기·다운로드는 <a href="' + pageOrigUrl + '" target="_blank">Confluence 원본 페이지</a>에서 가능해요.';
         tbl.parentNode.insertBefore(notice, tbl);
         tbl.remove();
       }

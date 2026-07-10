@@ -142,7 +142,7 @@ header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;paddin
 .msg.user .avatar{background:var(--surface2);border:1px solid var(--border);}
 .bubble{max-width:90%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 20px 12px 20px;font-size:14px;line-height:1.75;box-shadow:var(--shadow);word-break:break-word;white-space:pre-wrap;}
 .msg.user .bubble{background:linear-gradient(135deg,rgba(58,111,247,.1),rgba(107,68,248,.06));border-color:rgba(58,111,247,.22);max-width:90%;}
-.bubble p{margin-bottom:7px;}.bubble p:last-child{margin-bottom:0;}
+.bubble p{margin-bottom:4px;line-height:1.65;}.bubble p:last-child{margin-bottom:0;}
 .bubble ul,.bubble ol{padding-left:0;margin:0;list-style:none;}
 .bubble li{margin:0;padding-left:16px;position:relative;line-height:1.5;}.bubble li::before{content:'•';position:absolute;left:4px;top:0;line-height:1.5;color:var(--text-muted);}
 .bubble li.li-sub{padding-left:28px;margin:0;}.bubble li.li-sub::before{content:'–';left:14px;font-size:12px;color:var(--text-dim);}
@@ -1595,6 +1595,7 @@ async function sendMsg() {
           }
           if (!rRes.ok) throw new Error((rData.error || '서버 오류') + ' (HTTP ' + rRes.status + ')');
           typEl.remove();
+          console.log('[AI 원본답변]', rData.answer);
           addMsg('ai', rData.answer, true);
         } catch(e) {
           typEl.remove();
@@ -1635,6 +1636,7 @@ async function sendMsg() {
     if (!res.ok) throw new Error((data.error || '서버 오류') + ' (HTTP ' + res.status + ')');
     console.log('[디버그] 매칭된 페이지:', data.matchedPages, '/ 모델:', data.model);
     typEl.remove();
+    console.log('[AI 원본답변]', data.answer);
     addMsg('ai', data.answer, true);
   } catch(e) {
     typEl.remove();
@@ -1711,9 +1713,12 @@ function mdToHtml(t) {
   t = t.replace(/<\/ul>\s*<p>\s*<\/p>\s*<ul>/g, '');
   t = t.replace(/<\/ul>\s*<br\s*\/?>\s*<ul>/g, '');
 
-  return t.split(/\n\n+/)
-    .map(function(b){ return b.trim().startsWith('<') ? b : '<p>'+b.replace(/\n/g,' ')+'</p>'; })
-    .join('');
+  return t.split(/\n\n+/).map(function(b){
+    b = b.trim();
+    if (b.startsWith('<')) return b;
+    // 단일 \n은 <br>로 변환 (줄바꿈 의미 보존)
+    return '<p>'+b.replace(/\n/g,'<br>')+'</p>';
+  }).join('');
 }
 
 function resizeTA(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; }

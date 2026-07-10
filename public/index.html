@@ -1670,9 +1670,7 @@ function addTyping() {
 }
 
 function mdToHtml(t) {
-  // 불완전한 [[ 제거
   t = t.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
-  // [[페이지명]] → 링크 (같은 페이지 중복 제거)
   var usedPages = {};
   t = t.replace(/\[\[(.+?)\]\]/g, function(_, pn) {
     var key = pn.trim().toLowerCase();
@@ -1682,49 +1680,35 @@ function mdToHtml(t) {
     if (r) return '<a class="page-ref" href="#" onclick="event.preventDefault();openModal(\'' + r.id + '\')">📄 '+pn+'</a>';
     return '<span class="page-ref-na">📄 '+pn+'</span>';
   });
-
-  // 헤딩
   t = t.replace(/^#### (.*)$/gm,'<h4>$1</h4>');
   t = t.replace(/^### (.*)$/gm,'<h3>$1</h3>');
   t = t.replace(/^## (.*)$/gm,'<h3>$1</h3>');
-  // 빈 헤딩(## 만 있는 줄) 제거
   t = t.replace(/^#{1,4}\s*$/gm, '');
   t = t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   t = t.replace(/`([^`]+)`/g,'<code>$1</code>');
-
-  // ★ - 항목 사이, 헤딩 다음 - 항목 사이 빈 줄을 변환 전에 모두 제거
-  // 패턴1: - 항목 뒤 빈 줄 뒤 - 항목
-  for (var _i = 0; _i < 5; _i++) {
-    t = t.replace(/(^[ \t]*-[ \t].+)\n\n+([ \t]*-[ \t])/gm, '$1\n$2');
+  // - 항목 사이 빈 줄 완전 제거 (공백 포함)
+  for (var _i = 0; _i < 8; _i++) {
+    t = t.replace(/(^[ \t]*-[ \t].+)\n[ \t]*\n+([ \t]*-[ \t])/gm, '$1\n$2');
   }
-  // 패턴2: 헤딩(###/##) 뒤 빈 줄 뒤 - 항목
-  t = t.replace(/(^#{1,4} .+)\n\n+([ \t]*-[ \t])/gm, '$1\n$2');
-  // 패턴3: - 항목 뒤 빈 줄 뒤 헤딩
-  t = t.replace(/(^[ \t]*-[ \t].+)\n\n+(#{1,4} )/gm, '$1\n$2');
-
+  t = t.replace(/(^#{1,4}[^\n]+)\n[ \t]*\n+([ \t]*-[ \t])/gm, '$1\n$2');
   t = t.replace(/^ {2,}- (.+)$/gm,'<li class="li-sub">$1</li>');
   t = t.replace(/^- (.+)$/gm,'<li>$1</li>');
-
-  // li 변환 후에도 혹시 남은 빈 줄 제거
-  t = t.replace(/(<\/li>)\s*\n[\s\n]*(?=<li)/g, '$1\n');
-
-  // li 묶기
+  t = t.replace(/(<\/li>)[ \t]*\n[ \t\n]*(?=<li)/g, '$1\n');
   t = t.replace(/(<li[^>]*>[\s\S]*?<\/li>\n?)+/g, function(m){ return '<ul>'+m+'</ul>'; });
-  t = t.replace(/<\/ul>\s*<ul>/g, '');
-  // ul 사이에 낀 빈 p 제거
-  t = t.replace(/<\/ul>\s*<p>\s*<\/p>\s*<ul>/g, '');
-  t = t.replace(/<\/ul>\s*<br\s*\/?>\s*<ul>/g, '');
-
-  return t.split(/\n\n+/).map(function(b){
-    b = b.trim();
-    if (!b) return '';
-    if (b.startsWith('<')) return b;
-    // 잔여 마크다운 기호 제거 (###, ## 등이 변환 안 된 경우)
-    b = b.replace(/^#{1,4}\s*/gm, '');
-    return b ? '<p>'+b.replace(/\n/g,' ')+'</p>' : '';
-  }).filter(Boolean).join('');
+  // ul 사이의 모든 내용 제거
+  t = t.replace(/<\/ul>[\s\S]*?<ul>/g, '</ul><ul>');
+  // 나머지: 줄 단위로 p 변환
+  var lines = t.split('\n');
+  var out = [];
+  for (var j = 0; j < lines.length; j++) {
+    var line = lines[j].trim();
+    if (!line) continue;
+    if (line.startsWith('<')) { out.push(line); continue; }
+    line = line.replace(/^#{1,4}\s*/, '');
+    if (line) out.push('<p>'+line+'</p>');
+  }
+  return out.join('');
 }
-
 function resizeTA(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; }
 
 // ── 초기화 ──

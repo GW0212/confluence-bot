@@ -197,8 +197,8 @@ ${question}
 
           const finishReason = data.candidates?.[0]?.finishReason;
           let cleaned = raw.replace(/\[\[(?![^\]]*\]\])[^\n]*/g, '');
-          // 연속 빈 줄(\n\n 이상) → 단일 \n으로 치환 (렌더링 시 줄바꿈 버그 방지)
-          cleaned = cleaned.replace(/\n{2,}/g, '\n');
+          // 빈 줄 제거: 순수 \n\n뿐 아니라 공백+줄바꿈 혼합 패턴도 처리
+          cleaned = cleaned.replace(/[ \t]*\n[ \t]*\n[ \t]*/g, '\n');
           if (finishReason === 'MAX_TOKENS') {
             cleaned += '\n\n*(답변이 길어 일부가 잘렸어요. "계속 답변해줘"라고 다시 물어보시면 이어서 답해드릴게요.)*';
           }

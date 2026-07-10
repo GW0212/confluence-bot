@@ -142,7 +142,7 @@ header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;paddin
 .msg.user .avatar{background:var(--surface2);border:1px solid var(--border);}
 .bubble{max-width:90%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 20px 12px 20px;font-size:14px;line-height:1.75;box-shadow:var(--shadow);word-break:break-word;white-space:pre-wrap;}
 .msg.user .bubble{background:linear-gradient(135deg,rgba(58,111,247,.1),rgba(107,68,248,.06));border-color:rgba(58,111,247,.22);max-width:90%;}
-.bubble p{margin-bottom:4px;line-height:1.65;}.bubble p:last-child{margin-bottom:0;}
+.bubble p{margin-bottom:0;line-height:1.65;}.bubble p:last-child{margin-bottom:0;}
 .bubble ul,.bubble ol{padding-left:0;margin:0;list-style:none;}
 .bubble li{margin:0;padding-left:16px;position:relative;line-height:1.5;}.bubble li::before{content:'•';position:absolute;left:4px;top:0;line-height:1.5;color:var(--text-muted);}
 .bubble li.li-sub{padding-left:28px;margin:0;}.bubble li.li-sub::before{content:'–';left:14px;font-size:12px;color:var(--text-dim);}
@@ -1715,10 +1715,12 @@ function mdToHtml(t) {
 
   return t.split(/\n\n+/).map(function(b){
     b = b.trim();
+    if (!b) return '';
     if (b.startsWith('<')) return b;
-    // 단일 \n은 <br>로 변환 (줄바꿈 의미 보존)
-    return '<p>'+b.replace(/\n/g,'<br>')+'</p>';
-  }).join('');
+    // 잔여 마크다운 기호 제거 (###, ## 등이 변환 안 된 경우)
+    b = b.replace(/^#{1,4}\s*/gm, '');
+    return b ? '<p>'+b.replace(/\n/g,' ')+'</p>' : '';
+  }).filter(Boolean).join('');
 }
 
 function resizeTA(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; }

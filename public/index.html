@@ -191,7 +191,7 @@ textarea::placeholder{color:var(--text-dim);}
 .modal-body p{margin-bottom:6px;color:var(--text);}
 .modal-body p:empty{display:none;}
 /* li 내부 여백 완전 제거 - Confluence의 p 감싸기 패턴 대응 */
-.modal-body ul, .modal-body ol { padding-left:22px; margin:2px 0; }
+.modal-body ul, .modal-body ol { padding-left:22px; margin:0; }
 .modal-body li > p,
 .modal-body li > div:not(ul):not(ol),
 .modal-body li > span,
@@ -203,8 +203,8 @@ textarea::placeholder{color:var(--text-dim);}
 }
 .modal-body li > p:empty, .modal-body li > div:empty { display:none!important; }
 .modal-body li {
-  margin:0 0 1px 0!important;
-  padding:0!important;color:var(--text);line-height:1.65;
+  margin:0!important;padding:0!important;
+  color:var(--text);line-height:1.65;
 }
 /* 중첩 ul/ol은 반드시 block */
 .modal-body li > ul, .modal-body li > ol {
@@ -1247,6 +1247,20 @@ async function openModal(id) {
     // 혹시 남은 인라인 style 제거
     root.querySelectorAll('[style]').forEach(function(el) {
       el.removeAttribute('style');
+    });
+
+    // li 안의 p 언래핑 (서버에서 못 잡은 경우 이중 처리)
+    root.querySelectorAll('li > p').forEach(function(p) {
+      while (p.firstChild) p.parentNode.insertBefore(p.firstChild, p);
+      p.remove();
+    });
+
+    // ul/ol 안의 li 사이 br 및 빈 텍스트 노드 제거
+    root.querySelectorAll('ul, ol').forEach(function(list) {
+      Array.from(list.childNodes).forEach(function(node) {
+        if (node.nodeType === 3 && !node.textContent.trim()) { node.parentNode.removeChild(node); return; }
+        if (node.nodeType === 1 && node.tagName === 'BR') { node.parentNode.removeChild(node); return; }
+      });
     });
 
     // 빈 p/li 제거

@@ -1684,9 +1684,11 @@ function mdToHtml(t) {
   });
 
   // 헤딩
-  t = t.replace(/^#### (.+)$/gm,'<h4>$1</h4>');
-  t = t.replace(/^### (.+)$/gm,'<h3>$1</h3>');
-  t = t.replace(/^## (.+)$/gm,'<h3>$1</h3>');
+  t = t.replace(/^#### (.*)$/gm,'<h4>$1</h4>');
+  t = t.replace(/^### (.*)$/gm,'<h3>$1</h3>');
+  t = t.replace(/^## (.*)$/gm,'<h3>$1</h3>');
+  // 빈 헤딩(## 만 있는 줄) 제거
+  t = t.replace(/^#{1,4}\s*$/gm, '');
   t = t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   t = t.replace(/`([^`]+)`/g,'<code>$1</code>');
 

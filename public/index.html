@@ -1058,6 +1058,12 @@ function showMain(allPages, loaded, savedAt) {
     if (confirm('캐시를 삭제하고 다시 불러올까요?')) { clearCache(); location.reload(); }
   });
   addChips();
+
+  // 메인 화면 진입 시 질문 입력창에 바로 포커스 (클릭 없이 바로 타이핑 가능하도록)
+  setTimeout(function(){
+    var qi = document.getElementById('q-input');
+    if (qi) qi.focus();
+  }, 0);
 }
 
 function addChips() {

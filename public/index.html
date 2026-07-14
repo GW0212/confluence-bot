@@ -1701,8 +1701,9 @@ function mdToHtml(t) {
   t = t.replace(/^-[ \t]*(.+)$/gm,'<li class="li-main">$1</li>');
   t = t.replace(/(<\/li>)[ \t]*\n[ \t\n]*(?=<li)/g, '$1\n');
   t = t.replace(/(<li[^>]*>[\s\S]*?<\/li>\n?)+/g, function(m){ return '<ul>'+m+'</ul>'; });
-  // ul 사이의 모든 내용 제거
-  t = t.replace(/<\/ul>[\s\S]*?<ul>/g, '</ul><ul>');
+  // ul 사이에 순수 공백(줄바꿈)만 있을 때만 병합. 그 사이에 실제 내용(예: ### 소제목)이
+  // 있으면 절대 지우지 않는다. (기존 [\s\S]*? 는 소제목까지 통째로 삭제해버리던 버그)
+  t = t.replace(/<\/ul>[ \t\n]*<ul>/g, '</ul><ul>');
   // 나머지: 줄 단위로 p 변환
   var lines = t.split('\n');
   var out = [];

@@ -1689,13 +1689,16 @@ function mdToHtml(t) {
   t = t.replace(/^#{1,4}\s*$/gm, '');
   t = t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   t = t.replace(/`([^`]+)`/g,'<code>$1</code>');
-  // - 항목 사이 빈 줄 완전 제거 (공백 포함)
+  // - 항목 사이 빈 줄 완전 제거 (공백 포함, 대시 뒤 공백 유무 모두 허용)
   for (var _i = 0; _i < 8; _i++) {
-    t = t.replace(/(^[ \t]*-[ \t].+)\n[ \t]*\n+([ \t]*-[ \t])/gm, '$1\n$2');
+    t = t.replace(/(^[ \t]*-[ \t]*\S.*)\n[ \t]*\n+([ \t]*-[ \t]*\S)/gm, '$1\n$2');
   }
-  t = t.replace(/(^#{1,4}[^\n]+)\n[ \t]*\n+([ \t]*-[ \t])/gm, '$1\n$2');
-  t = t.replace(/^ {2,}- (.+)$/gm,'<li class="li-sub">$1</li>');
-  t = t.replace(/^- (.+)$/gm,'<li class="li-main">$1</li>');
+  t = t.replace(/(^#{1,4}[^\n]+)\n[ \t]*\n+([ \t]*-[ \t]*\S)/gm, '$1\n$2');
+  // 대시 뒤에 공백이 없는 경우(-내용)도 정상적으로 li로 인식하도록 수정
+  // (기존 정규식은 "- " 형태만 매칭해서, "-마비 지속 시간"처럼 공백 없는 하위 항목이
+  //  li로 변환되지 않고 평문으로 남았다가 아래 </ul>~<ul> 병합 로직에서 통째로 삭제되던 버그)
+  t = t.replace(/^ {2,}-[ \t]*(.+)$/gm,'<li class="li-sub">$1</li>');
+  t = t.replace(/^-[ \t]*(.+)$/gm,'<li class="li-main">$1</li>');
   t = t.replace(/(<\/li>)[ \t]*\n[ \t\n]*(?=<li)/g, '$1\n');
   t = t.replace(/(<li[^>]*>[\s\S]*?<\/li>\n?)+/g, function(m){ return '<ul>'+m+'</ul>'; });
   // ul 사이의 모든 내용 제거
